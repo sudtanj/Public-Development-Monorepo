@@ -1,0 +1,57 @@
+name: Deploy Arduino showcase
+
+on:
+  push:
+    branches: [main]
+    paths: ['arduino-*/**', 'site/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - uses: actions/configure-pages@v5
+
+      - name: Build sketches and assemble site
+        run: |
+          mkdir -p _site/projects
+          cp site/* _site/
+          # cache-bust assets so HTML, JS and CSS always match
+          sed -i "s#player.js\"#player.js?v=$GITHUB_SHA\"#; s#style.css\"#style.css?v=$GITHUB_SHA\"#" _site/player.html _site/index.html
+          list=()
+          for d in arduino-*/; do
+            d=${d%/}
+            [ -f "$d/wokwi.toml" ] || continue
+            ./"$d"/build.sh
+            mkdir -p "_site/projects/$d"
+            cp "$d/build/sketch.ino.hex" "_site/projects/$d/sketch.hex"
+            cp "$d/diagram.json" "_site/projects/$d/"
+            list+=("$d")
+          done
+          printf '%s\n' "${list[@]}" | jq -R . | jq -sc . > _site/projects.json
+          cat _site/projects.json
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

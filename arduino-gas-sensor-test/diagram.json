@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "author": "sudtanj",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-gas-sensor", "id": "gas", "top": -120, "left": 150, "attrs": {} }
+  ],
+  "connections": [
+    [ "gas:GND", "uno:GND.1", "black", [ "v0" ] ],
+    [ "gas:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "gas:AOUT", "uno:A0", "green", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

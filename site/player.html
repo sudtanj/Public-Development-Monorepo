@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arduino Showcase</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<p><a href="index.html">← All projects</a></p>
+<h1 id="title"></h1>
+<p id="error"></p>
+<div id="wrap"><div id="stage" class="board"><wokwi-arduino-uno id="uno"></wokwi-arduino-uno></div></div>
+<div class="controls"><label id="label"></label><input type="range" id="slider"><output id="value"></output></div>
+<p><button id="reset">Reset</button> · <a id="src" href="#">View source</a></p>
+<h3>Serial monitor (9600 baud)</h3>
+<pre id="serial"></pre>
+<script type="module" src="player.js"></script>
+</body></html>

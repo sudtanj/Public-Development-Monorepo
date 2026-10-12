@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "author": "sudtanj",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-hc-sr04", "id": "sonar", "top": -120, "left": 150, "attrs": { "distance": "100" } }
+  ],
+  "connections": [
+    [ "sonar:GND", "uno:GND.1", "black", [ "v0" ] ],
+    [ "sonar:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "sonar:TRIG", "uno:7", "green", [ "v0" ] ],
+    [ "sonar:ECHO", "uno:8", "blue", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

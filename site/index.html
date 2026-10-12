@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arduino Showcase</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<h1>Arduino Showcase</h1>
+<p>Interactive Arduino Uno simulations running right in your browser (powered by
+<a href="https://github.com/wokwi/avr8js">avr8js</a> and <a href="https://github.com/wokwi/wokwi-elements">Wokwi Elements</a>).
+Source: <a href="https://github.com/sudtanj/Public-Development-Monorepo">sudtanj/Public-Development-Monorepo</a>.</p>
+<ul class="cards" id="cards"></ul>
+<script type="module">
+const desc = {
+  'arduino-analog-read': 'Reads a potentiometer and prints it over serial.',
+  'arduino-icare-sensor': 'Sends sensor data as JSON for the iCare PHR app.',
+  'arduino-icare-json-sensor': 'Builds the iCare payload with ArduinoJson.',
+  'arduino-smoke-sensor': 'Streams MQ-2 gas/smoke readings.',
+  'arduino-gas-sensor-test': 'Gas sensor test.',
+  'arduino-ultrasonic-hcsr04': 'Measures distance with an HC-SR04.',
+};
+const projects = await (await fetch('projects.json')).json();
+document.getElementById('cards').innerHTML = projects.map(p =>
+  `<li><h2>${p.replace('arduino-','').replaceAll('-',' ')}</h2><p>${desc[p] ?? ''}</p><a href="player.html?p=${p}">Play ▶</a></li>`).join('');
+</script>
+</body></html>

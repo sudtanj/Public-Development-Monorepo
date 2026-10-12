@@ -1,0 +1,4 @@
+name: Prints analog readings
+version: 1
+steps:
+  - wait-serial: 'NewSensor148,'

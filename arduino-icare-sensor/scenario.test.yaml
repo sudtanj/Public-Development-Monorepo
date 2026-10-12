@@ -1,0 +1,4 @@
+name: Prints iCare JSON
+version: 1
+steps:
+  - wait-serial: '"message":"success"'

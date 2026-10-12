@@ -1,0 +1,103 @@
+name: Arduino / Wokwi
+
+on:
+  push:
+    branches: [main]
+    paths: ['arduino-*/**']
+  pull_request:
+    paths: ['arduino-*/**']
+  workflow_dispatch:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.find.outputs.projects }}
+      has_projects: ${{ steps.find.outputs.has_projects }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find arduino-* project folders
+        id: find
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          all=$(for d in arduino-*/; do [ -f "${d}wokwi.toml" ] && echo "${d%/}"; done | sort)
+
+          # Only folders with a wokwi.toml are Wokwi projects.
+          # Manual runs deploy everything; push/PR runs only changed folders.
+          case "$EVENT" in
+            workflow_dispatch) selected="$all" ;;
+            pull_request)      base="$PR_BASE" ;;
+            *)                 base="$BASE_SHA" ;;
+          esac
+
+          if [ -z "${selected:-}" ]; then
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              selected="$all"
+            else
+              changed=$(git diff --name-only "$base" HEAD | cut -d/ -f1 | sort -u)
+              selected=$(comm -12 <(echo "$all") <(echo "$changed"))
+            fi
+          fi
+
+          json=$(echo "$selected" | sed '/^$/d' | jq -R . | jq -sc .)
+          echo "projects=$json" >> "$GITHUB_OUTPUT"
+          if [ "$json" = "[]" ]; then
+            echo "has_projects=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_projects=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Projects: $json"
+
+  wokwi:
+    needs: detect
+    if: needs.detect.outputs.has_projects == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.detect.outputs.projects) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Wokwi project files
+        working-directory: ${{ matrix.project }}
+        run: |
+          for f in wokwi.toml diagram.json; do
+            [ -f "$f" ] || { echo "::error::$f missing in ${{ matrix.project }}"; exit 1; }
+          done
+
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Build sketch
+        working-directory: ${{ matrix.project }}
+        run: |
+          # build.sh compiles the sketch (board/FQBN)
+          # and produces the firmware referenced by wokwi.toml.
+          if [ -x build.sh ]; then
+            ./build.sh
+          else
+            echo "No build.sh, assuming firmware is already referenced by wokwi.toml"
+          fi
+
+      - name: Install Wokwi CLI
+        run: |
+          curl -L https://wokwi.com/ci/install.sh | sh
+          echo "$HOME/.wokwi/bin" >> "$GITHUB_PATH"
+
+      - name: Run Wokwi simulation
+        env:
+          WOKWI_CLI_TOKEN: ${{ secrets.WOKWI_CLI_TOKEN }}
+        run: |
+          if [ -f "${{ matrix.project }}/scenario.test.yaml" ]; then
+            wokwi-cli "${{ matrix.project }}" --scenario scenario.test.yaml --timeout 60000
+          else
+            # No scenario: smoke-run only. A timeout is expected and not a failure.
+            wokwi-cli "${{ matrix.project }}" --timeout 10000 || true
+          fi

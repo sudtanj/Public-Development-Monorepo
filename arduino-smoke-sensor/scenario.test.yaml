@@ -1,0 +1,4 @@
+name: Prints gas readings
+version: 1
+steps:
+  - wait-serial: 'Gas Sensor903,'

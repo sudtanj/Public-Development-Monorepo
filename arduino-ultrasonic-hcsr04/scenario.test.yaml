@@ -1,0 +1,4 @@
+name: Prints distance
+version: 1
+steps:
+  - wait-serial: ' cm'
