@@ -4,5 +4,5 @@ set -euo pipefail
 cd "$(dirname "$0")"
 arduino-cli core update-index
 arduino-cli core install arduino:avr
-arduino-cli lib install "ArduinoJson@6"
+arduino-cli lib install "ArduinoJson@6.21.5"
 arduino-cli compile --fqbn arduino:avr:uno --output-dir build sketch
