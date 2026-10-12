@@ -1,0 +1,9 @@
+[package]
+name = "move_nft_creator"
+version = "0.0.1"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.18.1" }
+
+[addresses]
+overmind = "0x0"

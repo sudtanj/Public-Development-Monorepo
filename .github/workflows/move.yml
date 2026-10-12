@@ -1,0 +1,80 @@
+name: Move
+
+on:
+  push:
+    branches: [main]
+    paths: ['move-*/**', 'site/move-*/**', '.github/workflows/move.yml']
+  pull_request:
+    paths: ['move-*/**', 'site/move-*/**', '.github/workflows/move.yml']
+  workflow_dispatch:
+
+env:
+  # Must match the framework rev in each project's Move.toml
+  SUI_VERSION: testnet-v1.18.1
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.find.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          json=$(for d in move-*/; do [ -f "${d}Move.toml" ] && echo "${d%/}"; done | jq -R . | jq -sc .)
+          echo "projects=$json" >> "$GITHUB_OUTPUT"
+
+  unit-tests:
+    needs: detect
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.detect.outputs.projects) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Sui CLI
+        run: |
+          mkdir -p "$HOME/sui-bin"
+          curl -fsSL "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz" | tar -xz -C "$HOME/sui-bin"
+          echo "$HOME/sui-bin" >> "$GITHUB_PATH"
+      - run: sui --version
+      - name: Build
+        working-directory: ${{ matrix.project }}
+        run: sui move build
+      - name: Unit tests
+        working-directory: ${{ matrix.project }}
+        run: sui move test
+
+  localnet:
+    # Simulates the blockchain: starts a local Sui network, publishes the package and sends real transactions.
+    needs: [detect, unit-tests]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.detect.outputs.projects) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Sui CLI
+        run: |
+          mkdir -p "$HOME/sui-bin"
+          curl -fsSL "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz" | tar -xz -C "$HOME/sui-bin"
+          echo "$HOME/sui-bin" >> "$GITHUB_PATH"
+      - name: Local network end-to-end test
+        run: |
+          if [ -x "${{ matrix.project }}/scripts/localnet-e2e.sh" ]; then
+            "${{ matrix.project }}/scripts/localnet-e2e.sh"
+          else
+            echo "No scripts/localnet-e2e.sh in ${{ matrix.project }}, skipping."
+          fi
+
+  showcase-model:
+    # The browser showcase models the contract in JS; keep it honest with tests.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test site/move-nft-creator/

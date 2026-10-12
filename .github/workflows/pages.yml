@@ -1,9 +1,9 @@
-name: Deploy Arduino showcase
+name: Deploy showcase
 
 on:
   push:
     branches: [main]
-    paths: ['arduino-*/**', 'site/**', '.github/workflows/pages.yml']
+    paths: ['arduino-*/**', 'move-*/**', 'site/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -26,9 +26,9 @@ jobs:
       - name: Build sketches and assemble site
         run: |
           mkdir -p _site/projects
-          cp site/* _site/
+          cp -r site/. _site/
           # cache-bust assets so HTML, JS and CSS always match
-          sed -i "s#player.js\"#player.js?v=$GITHUB_SHA\"#; s#style.css\"#style.css?v=$GITHUB_SHA\"#" _site/player.html _site/index.html
+          find _site -name "*.html" -exec sed -i "s#\\(player\\|app\\)\\.js\"#\\1.js?v=$GITHUB_SHA\"#; s#style\\.css\"#style.css?v=$GITHUB_SHA\"#" {} +
           list=()
           for d in arduino-*/; do
             d=${d%/}

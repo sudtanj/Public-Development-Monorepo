@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Move NFT Creator - simulated chain</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}
+  fieldset{border:1px solid #ddd;border-radius:8px;padding:.8rem 1rem}
+  fieldset label{display:block;margin:.4rem 0}
+  fieldset input,fieldset select{width:100%;box-sizing:border-box}
+  table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #eee;padding:.3rem;text-align:left}
+  #nfts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.8rem}
+  .nft{border:1px solid #ddd;border-radius:8px;overflow:hidden;font-size:.8rem}
+  .nft img{width:100%;height:120px;object-fit:cover;background:#eee}
+  .nft div{padding:.4rem}
+  #error{color:#b00020;min-height:1.4em}
+  #log{background:#111;color:#7CFC00;padding:1rem;max-height:260px;overflow:auto;border-radius:8px;font-size:.8rem;white-space:pre-wrap}
+</style></head>
+<body>
+<p><a href="../index.html">← All projects</a></p>
+<h1>Move NFT Creator</h1>
+<p>Try the <code>overmind::NonFungibleToken</code> Move module on a simulated chain. This page runs an in-browser
+model of the contract's rules (minting for 1 SUI, combining, burning, withdrawing sales). The real contract is tested
+with <code>sui move test</code> and a local Sui network in
+<a href="https://github.com/sudtanj/Public-Development-Monorepo/tree/main/move-nft-creator">CI</a>.</p>
+
+<p><label>Acting as <select id="actor"></select></label>
+ <button id="faucet">Get 5 SUI from faucet</button> <button id="reset">Reset chain</button></p>
+<p id="error"></p>
+
+<div class="grid">
+  <fieldset id="mintBox"><legend>Mint NFT (costs 1 SUI)</legend>
+    <label>Recipient <select id="recipient"></select></label>
+    <label>Name <input id="name" value="Sunrise"></label>
+    <label>Description <input id="desc" value="First NFT"></label>
+    <label>Image URL (optional) <input id="image" placeholder="https://..."></label>
+    <button id="mint">Mint</button>
+  </fieldset>
+  <fieldset><legend>Combine two NFTs</legend>
+    <label>First <select id="c1"></select></label>
+    <label>Second <select id="c2"></select></label>
+    <label>New image URL (optional) <input id="cimage" placeholder="https://..."></label>
+    <button id="combine">Combine</button>
+  </fieldset>
+  <fieldset><legend>Burn / withdraw</legend>
+    <label>NFT <select id="b1"></select></label>
+    <button id="burn">Burn</button>
+    <p>MinterCap sales: <b id="sales"></b></p>
+    <button id="withdraw">Withdraw sales (manager)</button>
+  </fieldset>
+</div>
+
+<h3>Balances</h3><table id="balances"></table>
+<h3>NFTs</h3><div id="nfts"></div>
+<h3>Events</h3><pre id="log"></pre>
+<script type="module" src="app.js"></script>
+</body></html>

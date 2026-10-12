@@ -20,6 +20,8 @@ Every `arduino-*` folder is a [Wokwi](https://wokwi.com/arduino) project (Arduin
 
 [`arduino-esp8266-collection`](arduino-esp8266-collection) holds older ESP8266 sketches that Wokwi can't simulate.
 
+
+
 ### Play in the browser
 
 **[▶ Open the interactive showcase](https://sudtanj.github.io/Public-Development-Monorepo/)** - each project runs live on GitHub Pages (avr8js simulator): drag the sensor slider and watch the serial monitor. GitHub READMEs cannot run scripts, so the playable version lives on that page.
