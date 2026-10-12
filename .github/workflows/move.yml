@@ -36,7 +36,9 @@ jobs:
       - name: Install Sui CLI
         run: |
           mkdir -p "$HOME/sui-bin"
-          curl -fsSL "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz" | tar -xz -C "$HOME/sui-bin"
+          curl -fsSL "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz" \
+            | tar -xz -C "$HOME/sui-bin" ./target/release/sui-ubuntu-x86_64
+          mv "$HOME/sui-bin/target/release/sui-ubuntu-x86_64" "$HOME/sui-bin/sui"
           echo "$HOME/sui-bin" >> "$GITHUB_PATH"
       - run: sui --version
       - name: Build
@@ -59,7 +61,9 @@ jobs:
       - name: Install Sui CLI
         run: |
           mkdir -p "$HOME/sui-bin"
-          curl -fsSL "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz" | tar -xz -C "$HOME/sui-bin"
+          curl -fsSL "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz" \
+            | tar -xz -C "$HOME/sui-bin" ./target/release/sui-ubuntu-x86_64
+          mv "$HOME/sui-bin/target/release/sui-ubuntu-x86_64" "$HOME/sui-bin/sui"
           echo "$HOME/sui-bin" >> "$GITHUB_PATH"
       - name: Local network end-to-end test
         run: |
@@ -77,4 +81,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test site/move-nft-creator/
+      - run: node --test site/move-nft-creator/chain.test.js
