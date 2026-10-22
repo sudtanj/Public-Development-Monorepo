@@ -3,7 +3,7 @@ name: Deploy showcase
 on:
   push:
     branches: [main]
-    paths: ['arduino-*/**', 'move-*/**', 'site/**', '.github/workflows/pages.yml']
+    paths: ['arduino-*/**', 'move-*/**', 'thunkable/**', 'site/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,7 @@ jobs:
         run: |
           mkdir -p _site/projects
           cp -r site/. _site/
+          cp thunkable/*.aia _site/thunkable/
           # cache-bust assets so HTML, JS and CSS always match
           find _site -name "*.html" -exec sed -i "s#\\(player\\|app\\)\\.js\"#\\1.js?v=$GITHUB_SHA\"#; s#style\\.css\"#style.css?v=$GITHUB_SHA\"#" {} +
           list=()

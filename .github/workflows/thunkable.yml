@@ -1,0 +1,66 @@
+name: Thunkable
+
+on:
+  push:
+    branches: [main]
+    paths: ['thunkable/**', '.github/workflows/thunkable.yml']
+  pull_request:
+    paths: ['thunkable/**', '.github/workflows/thunkable.yml']
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate .aia archives
+        shell: python
+        run: |
+          import glob, json, sys, zipfile
+
+          files = sorted(glob.glob("thunkable/*.aia"))
+          if not files:
+              sys.exit("no .aia files found in thunkable/")
+
+          failed = False
+          for path in files:
+              errors = []
+              try:
+                  with zipfile.ZipFile(path) as z:
+                      if z.testzip() is not None:
+                          errors.append("corrupt zip entry")
+                      names = z.namelist()
+                      if "youngandroidproject/project.properties" not in names:
+                          errors.append("missing youngandroidproject/project.properties")
+                      screens = [n for n in names if n.endswith(".scm")]
+                      if not screens:
+                          errors.append("no screens (.scm)")
+                      for scm in screens:
+                          if scm[:-4] + ".bky" not in names:
+                              errors.append(f"{scm}: missing blocks file (.bky)")
+                          # .scm is a JSON object wrapped in "#|\n$JSON\n ... \n|#"
+                          text = z.read(scm).decode("utf-8")
+                          body = text.strip().removeprefix("#|").removesuffix("|#").strip().removeprefix("$JSON").strip()
+                          try:
+                              json.loads(body)
+                          except ValueError as e:
+                              errors.append(f"{scm}: invalid JSON ({e})")
+              except zipfile.BadZipFile:
+                  errors.append("not a zip archive")
+
+              if errors:
+                  failed = True
+                  for e in errors:
+                      print(f"::error file={path}::{e}")
+              else:
+                  print(f"ok  {path} ({len(screens)} screen(s))")
+
+          sys.exit(1 if failed else 0)
+
+      - name: Upload projects
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: thunkable-apps
+          path: thunkable/*.aia

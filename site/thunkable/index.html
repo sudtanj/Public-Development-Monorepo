@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thunkable app player</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  .wrap{display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start}
+  .phone{width:320px;flex:none;border:12px solid #222;border-radius:28px;overflow:hidden;background:#222}
+  .status{background:#000;color:#fff;font-size:.7rem;padding:2px 8px;text-align:right}
+  .titlebar{background:#3f51b5;color:#fff;padding:.7rem;font-size:1.1rem}
+  .screen{height:568px;overflow:auto;display:flex;flex-direction:column;align-items:flex-start;background:#fff;
+    font-family:Roboto,system-ui,sans-serif;font-size:14px}
+  .screen *{box-sizing:border-box;min-width:0;min-height:0}
+  .screen .row{display:flex;flex-direction:row;align-items:flex-start}
+  .screen .col{display:flex;flex-direction:column;align-items:flex-start}
+  .screen button{border:none;background:#e0e0e0;padding:.5rem .8rem;font:inherit;cursor:pointer;box-shadow:0 1px 2px #0004}
+  .screen textarea,.screen input{font:inherit}
+  .screen img{object-fit:contain}
+  .screen img:not([src]){outline:1px dashed #ccc}
+  .screen img.canvas{background:#fff}
+  .side{flex:1;min-width:300px}
+  pre.code{background:#f6f8fa;padding:1rem;border-radius:8px;overflow:auto;font-size:.8rem}
+  #log{background:#111;color:#7CFC00;padding:1rem;height:160px;overflow:auto;border-radius:8px;font-size:.8rem;white-space:pre-wrap}
+</style></head>
+<body>
+<p><a href="../index.html">← All projects</a></p>
+<h1 id="title">Thunkable app</h1>
+<p>This page loads the app straight from its <code>.aia</code> export. The screen is drawn from the app's designer
+file, and the buttons run the app's own blocks in a small in-browser interpreter. Features that need phone
+hardware or Thunkable's cloud services (CamVision, emotion and image recognition) can't run in a browser, so they're
+written to the event log instead.
+<a id="download">Download the .aia</a> · <a id="src">Source</a></p>
+<p id="error"></p>
+<div class="wrap">
+  <div class="phone">
+    <div class="status" id="status"></div>
+    <div class="titlebar" id="titlebar"></div>
+    <div class="screen" id="screen"></div>
+  </div>
+  <div class="side">
+    <h3>Event log</h3><pre id="log"></pre>
+    <h3>Non-visible components</h3><p id="nonvisible"></p>
+    <h3>Blocks</h3><pre class="code" id="blocks"></pre>
+  </div>
+</div>
+<script type="module" src="app.js"></script>
+</body></html>
