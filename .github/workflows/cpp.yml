@@ -1,0 +1,27 @@
+name: C++
+
+on:
+  push:
+    branches: [main]
+    paths: ['cpp-*/**', 'site/cpp-*/**', '.github/workflows/cpp.yml']
+  pull_request:
+    paths: ['cpp-*/**', 'site/cpp-*/**', '.github/workflows/cpp.yml']
+  workflow_dispatch:
+
+jobs:
+  battleship:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: g++ -O2 -o battleship cpp-battleship/main.cpp
+
+      - name: Play a full game
+        run: python3 -I cpp-battleship/test_e2e.py ./battleship
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test the browser model
+        run: node --test site/cpp-battleship/game.test.js

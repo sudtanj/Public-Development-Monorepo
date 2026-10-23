@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Battleship (C++) - simulated in the browser</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  .wrap{display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start}
+  .sea{display:grid;grid-template-columns:28px repeat(10,32px);gap:2px}
+  .sea .label{display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#666}
+  .sea button{width:32px;height:32px;border:1px solid #c9d6e3;border-radius:4px;background:#e8f1fa;cursor:pointer;
+    font-size:.9rem;padding:0}
+  .sea button:hover{outline:2px solid #0b6bcb}
+  .sea button.player{background:#3f7bd9;border-color:#3f7bd9}
+  .sea button.com{background:#555;border-color:#555}
+  .sea button.sunk{background:#d93f3f;border-color:#d93f3f;color:#fff}
+  .sea button.miss::after{content:'•';color:#666}
+  .side{flex:1;min-width:300px}
+  #terminal{background:#111;color:#7CFC00;padding:1rem;height:360px;overflow:auto;border-radius:8px;font-size:.8rem;
+    white-space:pre;margin:0}
+  .legend span{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:middle;margin:0 .3rem 0 .8rem}
+  #status{font-weight:bold}
+</style></head>
+<body>
+<p><a href="../index.html">← All projects</a></p>
+<h1>Battleship (C++)</h1>
+<p>A browser version of <a href="https://github.com/sudtanj/Public-Development-Monorepo/tree/main/cpp-battleship"><code>cpp-battleship/main.cpp</code></a>,
+a console game. Clicking a cell types its column and row into the game, and the panel on the right shows the program's
+output. The game logic is a line-by-line model of the C++ code, and CI checks the real program by compiling it and
+playing a full game.</p>
+
+<p><span id="status"></span>
+  <label><input type="checkbox" id="reveal"> Show COM's ships (the C++ program prints the whole map)</label>
+  <button id="restart">New game</button></p>
+<p class="legend"><span style="background:#3f7bd9"></span>your ships (rows 1-4)<span style="background:#555"></span>COM's ships
+  (rows 6-9)<span style="background:#d93f3f"></span>sunk<span style="background:#e8f1fa;border:1px solid #c9d6e3"></span>water (• = shot)</p>
+
+<div class="wrap">
+  <div class="sea" id="sea"></div>
+  <div class="side">
+    <pre id="terminal"></pre>
+  </div>
+</div>
+
+<h3>Quirks of the original (kept on purpose)</h3>
+<ul>
+  <li>COM never shoots back, so you can't lose. The game ends after you destroy 3 ships.</li>
+  <li>"Press 1 to start" isn't read, so the first number you type is already the column.</li>
+  <li>Hitting a ship sinks only the hit cell and the cells to its right. The loop meant to clear the left side starts on
+    a cell that was just cleared, so it never runs. The leftover part counts as another ship if you hit it.</li>
+  <li>The sinking loop doesn't stop at the edge of the board. A ship ending in column 10 also sinks a ship that starts in
+    column 1 of the next row.</li>
+  <li>Shooting your own ships or the same cell twice is allowed and does nothing.</li>
+</ul>
+<script type="module" src="app.js"></script>
+</body></html>

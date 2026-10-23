@@ -47,6 +47,13 @@ The showcase site is built by `.github/workflows/pages.yml` from `site/` and eac
 Folders without a `wokwi.toml` are ignored by CI. The workflow needs a `WOKWI_CLI_TOKEN` repository secret
 (create one at <https://wokwi.com/dashboard/ci>).
 
+## C++
+
+[`cpp-battleship`](cpp-battleship) is a console Battleship prototype. `.github/workflows/cpp.yml` compiles it and plays
+a full game through stdin. The showcase has a
+**[▶ playable browser version](https://sudtanj.github.io/Public-Development-Monorepo/cpp-battleship/)** that models
+the program line by line and shows the same terminal output.
+
 ## Thunkable and App Inventor apps
 
 These are 2017 Android projects saved as `.aia` exports:
