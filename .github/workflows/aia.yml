@@ -1,11 +1,11 @@
-name: Thunkable
+name: App Inventor projects
 
 on:
   push:
     branches: [main]
-    paths: ['thunkable/**', '.github/workflows/thunkable.yml']
+    paths: ['thunkable/**', 'appinventor-*/**', '.github/workflows/aia.yml']
   pull_request:
-    paths: ['thunkable/**', '.github/workflows/thunkable.yml']
+    paths: ['thunkable/**', 'appinventor-*/**', '.github/workflows/aia.yml']
   workflow_dispatch:
 
 jobs:
@@ -19,9 +19,9 @@ jobs:
         run: |
           import glob, json, sys, zipfile
 
-          files = sorted(glob.glob("thunkable/*.aia"))
+          files = sorted(glob.glob("thunkable/*.aia") + glob.glob("appinventor-*/*.aia"))
           if not files:
-              sys.exit("no .aia files found in thunkable/")
+              sys.exit("no .aia files found")
 
           failed = False
           for path in files:
@@ -62,5 +62,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: thunkable-apps
-          path: thunkable/*.aia
+          name: aia-projects
+          path: |
+            thunkable/*.aia
+            appinventor-*/*.aia

@@ -12,7 +12,7 @@ Two [Thunkable Classic](https://thunkable.com) Android apps from 2017, moved her
 ## Play in the browser
 
 **[▶ Open the showcase](https://sudtanj.github.io/Public-Development-Monorepo/)**. The player
-(`site/thunkable/`) unzips the `.aia` in the browser and draws the screen from its designer file. It runs the app's
+(`site/aia/`) unzips the `.aia` in the browser and draws the screen from its designer file. It runs the app's
 blocks in a small interpreter and shows them as readable code. The QR code generator works end to end. For CamVision,
 taking or picking a photo works; the recognition features need Thunkable's cloud services, so they're only logged.
 
@@ -27,6 +27,6 @@ Thunkable Classic has been shut down, and the current Thunkable can't import `.a
 
 ## CI
 
-`.github/workflows/thunkable.yml` checks that every `*.aia` here is a valid project archive. On `main`, it uploads
-the archives as a `thunkable-apps` workflow artifact so you can download and import them.
+`.github/workflows/aia.yml` checks that every `*.aia` here is a valid project archive. On `main`, it uploads
+the archives as an `aia-projects` workflow artifact so you can download and import them.
 Thunkable has no public deploy API, so the workflow can't push projects to a Thunkable account.

@@ -47,11 +47,17 @@ The showcase site is built by `.github/workflows/pages.yml` from `site/` and eac
 Folders without a `wokwi.toml` are ignored by CI. The workflow needs a `WOKWI_CLI_TOKEN` repository secret
 (create one at <https://wokwi.com/dashboard/ci>).
 
-## Thunkable apps
+## Thunkable and App Inventor apps
 
-[`thunkable`](thunkable) holds two 2017 Thunkable Classic Android projects (`.aia` exports): CamVision and a QR code
-generator. `.github/workflows/thunkable.yml` validates the archives and publishes them as a downloadable artifact.
+These are 2017 Android projects saved as `.aia` exports:
+
+| Folder | Projects |
+| --- | --- |
+| [`thunkable`](thunkable) | Thunkable Classic apps: CamVision and a QR code generator |
+| [`appinventor-ihealth`](appinventor-ihealth) | MIT App Inventor: a live airflow graph from the iHealth sensor API |
+
+`.github/workflows/aia.yml` validates the archives and publishes them as a downloadable artifact.
 
 **[▶ Play them in the showcase](https://sudtanj.github.io/Public-Development-Monorepo/)**: the player at
-`site/thunkable/` draws each app's screen from the `.aia` and runs the app's blocks in the browser.
-See the folder's README for how to open them now that Thunkable Classic is gone.
+`site/aia/` draws each app's screen from the `.aia` and runs the app's blocks in the browser.
+See each folder's README for how to open the projects in App Inventor.
