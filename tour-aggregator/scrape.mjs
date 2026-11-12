@@ -173,10 +173,73 @@ async function scrapeObaja(out) {
   if (lastPage > MAX_PAGES) console.error(`Obaja Tour: stopped after ${MAX_PAGES} of ${lastPage} pages`);
 }
 
+// ---- Golden Rama (goldenrama.com): Next.js SSR, listing data is the __NEXT_DATA__ JSON; one entry per package ----
+
+const GOLDEN_RAMA = 'https://www.goldenrama.com';
+
+function goldenRamaProps(html) {
+  const json = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/.exec(html)?.[1];
+  return json ? JSON.parse(json).props?.pageProps : undefined;
+}
+
+export function parseGoldenRamaAreas(html) {
+  return [...new Set([...html.matchAll(/href="\/tours\/area\/([a-z0-9-]+)"/g)].map((m) => m[1]))];
+}
+
+// Departures come unsorted, so the nearest one is picked by date. Packages without departures are skipped like Obaja's.
+export function parseGoldenRamaPage(html) {
+  const props = goldenRamaProps(html);
+  const { data = [], metadata } = props?.tourSearch ?? {};
+  const destination = props?.tourDetailByArea?.data?.name ?? null;
+  const records = [];
+  for (const t of data) {
+    const title = decode(t.name);
+    const next = (t.departures ?? []).reduce((a, d) => (!a || d.date < a.date ? d : a), null);
+    if (!title || !next) continue;
+    records.push({
+      source: 'Golden Rama',
+      title,
+      url: `${GOLDEN_RAMA}/tours/${t.slug}`,
+      destination,
+      departure: next.date,
+      days: next.duration ?? t.duration ?? null,
+      price: next.startingPrice || t.startingPrice || null,
+      currency: 'IDR',
+      airline: decode(t.airlineName) || null,
+      image: t.pictures?.[0]?.url ?? null,
+    });
+  }
+  return { records, lastPage: Math.ceil((metadata?.total ?? 0) / (metadata?.per_page || 12)) || 1 };
+}
+
+// The listing ignores `limit` (12 per page), so each area is walked page by page. One bad area doesn't stop the rest.
+async function scrapeGoldenRama(out) {
+  const areas = parseGoldenRamaAreas(await (await request(`${GOLDEN_RAMA}/tours`)).text());
+  if (areas.length === 0) throw new Error('no areas found on /tours');
+  const failures = [];
+  for (const area of areas) {
+    try {
+      let lastPage = 1;
+      for (let page = 1; page <= lastPage && page <= MAX_PAGES; page++) {
+        const html = await (await request(`${GOLDEN_RAMA}/tours/area/${area}?page=${page}`)).text();
+        const parsed = parseGoldenRamaPage(html);
+        out.push(...parsed.records);
+        lastPage = parsed.lastPage;
+      }
+      if (lastPage > MAX_PAGES) console.error(`Golden Rama ${area}: stopped after ${MAX_PAGES} of ${lastPage} pages`);
+    } catch (err) {
+      console.error(`Golden Rama ${area}: ${err.message}`);
+      failures.push(`${area}: ${err.message}`);
+    }
+  }
+  if (failures.length) throw new Error(`${failures.length} of ${areas.length} areas failed (${failures.join('; ')})`);
+}
+
 // Adding a company: write a scraper that pushes normalized records into `out`, then list it here.
 const SOURCES = [
   { name: 'Avia Travel', url: 'https://www.avia.travel/tour', scrape: scrapeAvia },
   { name: 'Obaja Tour', url: 'https://www.obajatour.com/group-tour', scrape: scrapeObaja },
+  { name: 'Golden Rama', url: 'https://www.goldenrama.com/tours', scrape: scrapeGoldenRama },
 ];
 
 // `today` (YYYY-MM-DD, UTC) is the cutoff for past departures; records without a departure date are kept.

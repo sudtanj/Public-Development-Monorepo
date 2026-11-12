@@ -1,5 +1,7 @@
 // Preloaded with `node --import` so the real scrape.mjs runs against canned responses.
-// FAKE_AVIA / FAKE_OBAJA: ok (default) | down (HTTP 500) | offline (network error) | malformed (not the expected format)
+// FAKE_AVIA / FAKE_OBAJA / FAKE_GOLDENRAMA: ok (default) | down (HTTP 500) | offline (network error) | malformed (not the expected format)
+// FAKE_GOLDENRAMA also takes tours-broken (/tours lists no areas), area-asia-broken (truncated __NEXT_DATA__ on
+// /tours/area/asia) and empty-pages (area pages list no packages).
 // FAKE_AVIA=garbage-results serves the region list but unparseable search pages; region-1-down answers HTTP 500 to
 // the search for region 1 only; offsite-next points the pagination arrow at another host.
 // FAKE_BLOCK_HONEST_UA=1 answers 403 to the project's own user agent. Every request is appended to FAKE_LOG as JSON.
@@ -30,6 +32,16 @@ function obaja(page) {
   return new Response(body, { headers: { 'Content-Type': 'application/json' } });
 }
 
+const nextData = (json) => `<html><script id="__NEXT_DATA__" type="application/json">${json}</script></html>`;
+
+function goldenRama(mode, pathname) {
+  const areaPage = pathname.startsWith('/tours/area/');
+  if (mode === 'tours-broken' && !areaPage) return new Response('<html><body>coming soon</body></html>');
+  if (mode === 'area-asia-broken' && pathname === '/tours/area/asia') return new Response(nextData('{"props":'));
+  if (mode === 'empty-pages' && areaPage) return new Response(nextData('{"props":{"pageProps":{"tourSearch":{"data":[],"metadata":{"page":1,"per_page":12,"total":0}}}}}'));
+  return new Response(fixture('goldenrama-tours.html'));
+}
+
 globalThis.fetch = async (url, init = {}) => {
   const { hostname, pathname, searchParams } = new URL(url);
   const headers = init.headers ?? {};
@@ -39,9 +51,11 @@ globalThis.fetch = async (url, init = {}) => {
     return new Response('blocked', { status: 403 });
   }
   const isAvia = hostname === 'www.avia.travel';
-  const mode = (isAvia ? process.env.FAKE_AVIA : process.env.FAKE_OBAJA) ?? 'ok';
+  const isGoldenRama = hostname === 'www.goldenrama.com';
+  const mode = (isAvia ? process.env.FAKE_AVIA : isGoldenRama ? process.env.FAKE_GOLDENRAMA : process.env.FAKE_OBAJA) ?? 'ok';
   if (mode === 'down') return new Response('boom', { status: 500 });
   if (mode === 'offline') throw new TypeError('fetch failed');
   if (mode === 'malformed') return new Response('<html><body>{"data": [');
+  if (isGoldenRama) return goldenRama(mode, pathname);
   return isAvia ? avia(mode, method, pathname, init.body ?? '') : obaja(searchParams.get('page'));
 };

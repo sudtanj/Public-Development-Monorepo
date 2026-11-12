@@ -17,6 +17,7 @@ with its error in `sources` and the others still publish; the run exits non-zero
 | --- | --- |
 | Avia Travel | HTML. Region ids come from the search form on `/tour`; each region is a POST to `/search` plus the `Set-Cookie` session, then `/search/<offset>` pages are followed via the pagination "next" link. One record per departure; title, "from" price and image are shared by the departures of a card. |
 | Obaja Tour | The JSON API behind the site, `service.obajatour.com/v1/modules/tour/tours/regional`. One record per package, using its nearest departure. Packages with no scheduled departure are skipped. |
+| Golden Rama | The `__NEXT_DATA__` JSON embedded in the server-rendered pages. Area slugs come from the links on `/tours`; each `/tours/area/<slug>?page=N` is walked (12 packages per page, `limit` is ignored). One record per package, using its earliest departure and that departure's price; the area name is the destination. Detail pages are disallowed by `robots.txt` and are never fetched. |
 
 ## Adding a company
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { decode, parseAviaDate, parseAviaPage, parseAviaRegions, parseObajaTours } from './scrape.mjs';
+import { decode, parseAviaDate, parseAviaPage, parseAviaRegions, parseGoldenRamaAreas, parseGoldenRamaPage, parseObajaTours } from './scrape.mjs';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 
@@ -271,10 +271,110 @@ test('parseObajaTours skips a package without a title instead of failing the sou
   assert.deepEqual(records.map((r) => r.url.split('/').pop()), ['3']);
 });
 
-test('both sources emit records with the same fields, which site/tours/app.js reads', () => {
+test('all sources emit records with the same fields, which site/tours/app.js reads', () => {
   const avia = parseAviaPage(fixture('avia-search.html'), 'Japan').records[0];
   const obaja = parseObajaTours(JSON.parse(fixture('obaja-tours.json'))).records[0];
   const fields = ['airline', 'currency', 'days', 'departure', 'destination', 'image', 'price', 'source', 'title', 'url'];
   assert.deepEqual(Object.keys(avia).sort(), fields);
   assert.deepEqual(Object.keys(obaja).sort(), fields);
+  assert.deepEqual(Object.keys(parseGoldenRamaPage(fixture('goldenrama-tours.html')).records[0]).sort(), fields);
+});
+
+test('parseGoldenRamaAreas lists each area link once', () => {
+  assert.deepEqual(parseGoldenRamaAreas(fixture('goldenrama-tours.html')), ['asia', 'eropa']);
+  assert.deepEqual(parseGoldenRamaAreas('<html></html>'), []);
+});
+
+test('parseGoldenRamaPage maps the nearest departure, skips packages without departures and counts pages', () => {
+  const { records, lastPage } = parseGoldenRamaPage(fixture('goldenrama-tours.html'));
+  assert.equal(lastPage, 2);
+  assert.deepEqual(records, [
+    {
+      source: 'Golden Rama',
+      title: 'Favorite Switzerland Bernina Train + Jungfraujoch & Mineralbad Spa',
+      url: 'https://www.goldenrama.com/tours/favorite-switzerland-bernina-panoramic-train-jungfraujoch-mineralbad-spa',
+      destination: 'Asia',
+      departure: '2027-03-02',
+      days: 11,
+      price: 63888000,
+      currency: 'IDR',
+      airline: 'EMIRATES AIRLINES',
+      image: 'https://grts2.goldenrama.com/images/filedoc/pictureref/a1699cb847fe2ea90755f1314e5b3b38.jpg',
+    },
+    {
+      source: 'Golden Rama',
+      title: 'Favorite Switzerland Bernina Train + Jungfraujoch & Natural Thermal Spa',
+      url: 'https://www.goldenrama.com/tours/favorite-switzerland-bernina-train-jungfraujoch-natural-thermal-spa',
+      destination: 'Asia',
+      departure: '2027-06-21',
+      days: 10,
+      price: 57888000,
+      currency: 'IDR',
+      airline: 'ETIHAD AIRWAYS',
+      image: null,
+    },
+  ]);
+});
+
+test('parseGoldenRamaPage returns nothing for pages without the Next.js data block', () => {
+  assert.deepEqual(parseGoldenRamaPage('<html><body>maintenance</body></html>'), { records: [], lastPage: 1 });
+});
+
+const grPage = (data, metadata, extra = {}) =>
+  `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { tourSearch: { data, metadata }, ...extra } } })}</script>`;
+const grTour = (over = {}) => ({ name: 'Tour', slug: 'tour', departures: [{ date: '2027-01-01', duration: 5, startingPrice: 1000 }], ...over });
+
+test('parseGoldenRamaPage takes days and price from the earliest departure whatever the order', () => {
+  const departures = [
+    { date: '2027-09-01', duration: 9, startingPrice: 900 },
+    { date: '2027-02-01', duration: 7, startingPrice: 700 },
+    { date: '2027-05-01', duration: 8, startingPrice: 800 },
+  ];
+  const [r] = parseGoldenRamaPage(grPage([grTour({ departures })], { total: 1 })).records;
+  assert.deepEqual([r.departure, r.days, r.price], ['2027-02-01', 7, 700]);
+});
+
+test('parseGoldenRamaPage falls back to package duration and price when the departure has none', () => {
+  const departures = [{ date: '2027-02-01', startingPrice: 0 }];
+  const [r] = parseGoldenRamaPage(grPage([grTour({ departures, duration: 6, startingPrice: 600 })], { total: 1 })).records;
+  assert.deepEqual([r.days, r.price], [6, 600]);
+  const [bare] = parseGoldenRamaPage(grPage([grTour({ departures })], { total: 1 })).records;
+  assert.deepEqual([bare.days, bare.price, bare.airline, bare.destination], [null, null, null, null]);
+});
+
+test('parseGoldenRamaPage gives null image for missing or empty pictures', () => {
+  const html = grPage([grTour({ slug: 'a' }), grTour({ slug: 'b', pictures: [] }), grTour({ slug: 'c', pictures: [{}] })], { total: 3 });
+  assert.deepEqual(parseGoldenRamaPage(html).records.map((r) => r.image), [null, null, null]);
+});
+
+test('parseGoldenRamaPage skips packages with an empty or missing title or no departures and keeps the rest', () => {
+  const html = grPage([grTour({ name: '' }), grTour({ name: '  ' }), grTour({ name: undefined }), grTour({ slug: 'nodep', departures: undefined }), grTour({ slug: 'ok' })], { total: 5 });
+  assert.deepEqual(parseGoldenRamaPage(html).records.map((r) => r.url), ['https://www.goldenrama.com/tours/ok']);
+});
+
+test('parseGoldenRamaPage computes the page count from total and per_page', () => {
+  const pages = (metadata) => parseGoldenRamaPage(grPage([], metadata)).lastPage;
+  assert.equal(pages({ total: 24, per_page: 12 }), 2);
+  assert.equal(pages({ total: 25, per_page: 12 }), 3);
+  assert.equal(pages({ total: 12, per_page: 12 }), 1);
+  assert.equal(pages({ total: 0, per_page: 12 }), 1);
+  assert.equal(pages({ total: 30 }), 3);
+  assert.equal(pages({ total: 30, per_page: 0 }), 3);
+  assert.equal(pages(undefined), 1);
+});
+
+test('parseGoldenRamaPage tolerates a data block without tourSearch', () => {
+  const html = '<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{}}}</script>';
+  assert.deepEqual(parseGoldenRamaPage(html), { records: [], lastPage: 1 });
+  assert.deepEqual(parseGoldenRamaPage('<script id="__NEXT_DATA__" type="application/json">{}</script>'), { records: [], lastPage: 1 });
+});
+
+test('parseGoldenRamaPage throws on truncated JSON so the scraper can record the source error', () => {
+  assert.throws(() => parseGoldenRamaPage('<script id="__NEXT_DATA__" type="application/json">{"props":</script>'), SyntaxError);
+});
+
+test('parseGoldenRamaPage reads the destination from the area and decodes the title', () => {
+  const html = grPage([grTour({ name: 'A &amp; B' })], { total: 1 }, { tourDetailByArea: { data: { name: 'Eropa' } } });
+  const [r] = parseGoldenRamaPage(html).records;
+  assert.deepEqual([r.destination, r.title], ['Eropa', 'A & B']);
 });
