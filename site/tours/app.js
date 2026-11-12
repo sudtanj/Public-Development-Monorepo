@@ -84,6 +84,25 @@ function tidyTitle(title) {
   }).join(' ');
 }
 
+// Avia lists IATA codes ("GA", "GA&SQ;"), Golden Rama lists names in capitals; show names either way. Unknown codes stay as written.
+const AIRLINES = {
+  GA: 'Garuda Indonesia', SQ: 'Singapore Airlines', CA: 'Air China', EK: 'Emirates', MH: 'Malaysia Airlines',
+  MF: 'Xiamen Airlines', QF: 'Qantas', CZ: 'China Southern Airlines', QR: 'Qatar Airways', BR: 'EVA Air',
+  HO: 'Juneyao Air', JL: 'Japan Airlines', JAL: 'Japan Airlines', CX: 'Cathay Pacific', TK: 'Turkish Airlines',
+  VN: 'Vietnam Airlines', EY: 'Etihad Airways', NH: 'All Nippon Airways', ANA: 'All Nippon Airways', TW: "T'way Air",
+  PR: 'Philippine Airlines', HU: 'Hainan Airlines', KE: 'Korean Air', OZ: 'Asiana Airlines', TG: 'Thai Airways',
+  MU: 'China Eastern Airlines', CI: 'China Airlines', TR: 'Scoot', JQ: 'Jetstar', ID: 'Batik Air', QZ: 'AirAsia',
+  D7: 'AirAsia X', '7C': 'Jeju Air', LJ: 'Jin Air', NZ: 'Air New Zealand', SV: 'Saudia', WY: 'Oman Air',
+  ET: 'Ethiopian Airlines', UL: 'SriLankan Airlines', AI: 'Air India', LH: 'Lufthansa', KL: 'KLM', AF: 'Air France',
+  BA: 'British Airways', '3U': 'Sichuan Airlines', ZH: 'Shenzhen Airlines', MS: 'EgyptAir',
+};
+function airlineName(airline) {
+  if (/^[A-Z0-9]{2,3}([^A-Za-z0-9]+[A-Z0-9]{2,3})*[^A-Za-z0-9]*$/.test(airline)) {
+    return airline.match(/[A-Z0-9]{2,3}/g).map((code) => AIRLINES[code] ?? code).join(' & ');
+  }
+  return airline === airline.toUpperCase() ? airline.toLowerCase().replace(/(^|[\s.])\p{L}/gu, (c) => c.toUpperCase()) : airline;
+}
+
 function fillSelect(select, values, label = (v) => v) {
   for (const v of values) select.append(el('option', label(v), { value: v }));
 }
@@ -151,7 +170,7 @@ function card(t) {
   const rows = [
     ['Departure', t.departure && formatDate(t.departure)],
     ['Duration', t.days && `${t.days} days`],
-    ['Airline', t.airline],
+    ['Airline', t.airline && airlineName(t.airline)],
   ];
   for (const [name, value] of rows) {
     const group = el('div');
