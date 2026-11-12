@@ -1,9 +1,10 @@
 // Preloaded with `node --import` so the real scrape.mjs runs against canned responses.
-// FAKE_AVIA / FAKE_OBAJA / FAKE_GOLDENRAMA / FAKE_DWIDAYA / FAKE_BAYUBUANA: ok (default) | down (HTTP 500) | offline (network error) | malformed (not the expected format)
+// FAKE_AVIA / FAKE_OBAJA / FAKE_GOLDENRAMA / FAKE_DWIDAYA / FAKE_BAYUBUANA / FAKE_WITA: ok (default) | down (HTTP 500) | offline (network error) | malformed (not the expected format)
 // FAKE_GOLDENRAMA also takes tours-broken (/tours lists no areas), area-asia-broken (truncated __NEXT_DATA__ on
 // /tours/area/asia) and empty-pages (area pages list no packages).
 // FAKE_DWIDAYA=no-packages answers the search with an empty package list.
 // FAKE_BAYUBUANA also takes home-broken (the home page links no regions) and region-europe-down (HTTP 500 for the Europe page).
+// FAKE_WITA also takes list-broken (the listing has no tours) and detail-europe-down (HTTP 500 for the Europe tour page).
 // FAKE_AVIA=garbage-results serves the region list but unparseable search pages; region-1-down answers HTTP 500 to
 // the search for region 1 only; offsite-next points the pagination arrow at another host.
 // FAKE_BLOCK_HONEST_UA=1 answers 403 to the project's own user agent. Every request is appended to FAKE_LOG as JSON.
@@ -57,6 +58,12 @@ function bayuBuana(mode, pathname) {
   return new Response(fixture(pathname === '/' ? 'bayubuana-home.html' : 'bayubuana-region.html'));
 }
 
+function wita(mode, pathname) {
+  if (mode === 'list-broken' && pathname === '/grouptours/region') return new Response('<html><body>coming soon</body></html>');
+  if (mode === 'detail-europe-down' && pathname.includes('-europe-')) return new Response('boom', { status: 500 });
+  return new Response(fixture(pathname === '/grouptours/region' ? 'wita-list.html' : 'wita-detail.html'));
+}
+
 globalThis.fetch = async (url, init = {}) => {
   const { hostname, pathname, searchParams } = new URL(url);
   const headers = init.headers ?? {};
@@ -69,12 +76,14 @@ globalThis.fetch = async (url, init = {}) => {
   const isGoldenRama = hostname === 'www.goldenrama.com';
   const isDwidaya = hostname === 'www.dwidayatour.co.id';
   const isBayuBuana = hostname === 'www.bayubuanatravel.com';
-  const mode = (isAvia ? process.env.FAKE_AVIA : isGoldenRama ? process.env.FAKE_GOLDENRAMA : isDwidaya ? process.env.FAKE_DWIDAYA : isBayuBuana ? process.env.FAKE_BAYUBUANA : process.env.FAKE_OBAJA) ?? 'ok';
+  const isWita = hostname === 'www.witatour.com';
+  const mode = (isAvia ? process.env.FAKE_AVIA : isGoldenRama ? process.env.FAKE_GOLDENRAMA : isDwidaya ? process.env.FAKE_DWIDAYA : isBayuBuana ? process.env.FAKE_BAYUBUANA : isWita ? process.env.FAKE_WITA : process.env.FAKE_OBAJA) ?? 'ok';
   if (mode === 'down') return new Response('boom', { status: 500 });
   if (mode === 'offline') throw new TypeError('fetch failed');
   if (mode === 'malformed') return new Response('<html><body>{"data": [');
   if (isGoldenRama) return goldenRama(mode, pathname);
   if (isDwidaya) return dwidaya(mode, pathname);
   if (isBayuBuana) return bayuBuana(mode, pathname);
+  if (isWita) return wita(mode, pathname);
   return isAvia ? avia(mode, method, pathname, init.body ?? '') : obaja(searchParams.get('page'));
 };

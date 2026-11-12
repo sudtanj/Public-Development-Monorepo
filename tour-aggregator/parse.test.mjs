@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { decode, parseBayuBuanaPage, parseBayuBuanaRegions, parseDwidayaPackages, parseAviaDate, parseAviaPage, parseAviaRegions, parseGoldenRamaAreas, parseGoldenRamaPage, parseObajaTours } from './scrape.mjs';
+import { decode, parseBayuBuanaPage, parseBayuBuanaRegions, parseDwidayaPackages, parseAviaDate, parseAviaPage, parseAviaRegions, parseGoldenRamaAreas, parseGoldenRamaPage, parseObajaTours, parseWitaDetail, parseWitaList } from './scrape.mjs';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 
@@ -523,4 +523,54 @@ test('parseBayuBuanaPage picks the earliest of unsorted dates', () => {
 
 test('parseBayuBuanaPage returns nothing for pages without cards', () => {
   assert.deepEqual(parseBayuBuanaPage('<html><body>maintenance</body></html>', 'Asia'), []);
+});
+
+test('parseWitaList maps each card and takes the destination from the highlight with the same title', () => {
+  assert.deepEqual(parseWitaList(fixture('wita-list.html')), [
+    {
+      title: '7D/6N LEISURE CLASSIC TAIWAN & ALISHAN',
+      url: 'https://www.witatour.com/grouptours/view/7d-6n-leisure-classic-taiwan-and-alishan/',
+      destination: 'Taiwan',
+      days: 7,
+      price: 16800000,
+      image: 'https://www.witatour.com/assets/uploads/grouptour_products-images-1101-0.jpg',
+    },
+    {
+      title: '14D/11N WITA EUROPE MEDITERRANEAN HERITAGE & SCENIC JOURNEY',
+      url: 'https://www.witatour.com/grouptours/view/14d-11n-wita-europe-mediterranean-heritage-and-scenic-journey/',
+      destination: 'Europe',
+      days: 14,
+      price: 58900000,
+      image: 'https://www.witatour.com/assets/uploads/grouptour_products-images-1111-0.jpg',
+    },
+  ]);
+});
+
+test('parseWitaList uses null for a missing price, image, days and destination and skips cards without a link', () => {
+  const html = '<div class="grouptour-slide-hover"><a class="grouptour-view-details btn" href="https://www.witatour.com/grouptours/view/x/">View Details</a></div><p class="header">X</p>'
+    + '<div class="grouptour-slide-hover"><p class="header">No link</p></div>';
+  assert.deepEqual(parseWitaList(html), [{ title: 'X', url: 'https://www.witatour.com/grouptours/view/x/', destination: null, days: null, price: null, image: null }]);
+  assert.deepEqual(parseWitaList('<html><body>maintenance</body></html>'), []);
+});
+
+test('parseWitaDetail picks the earliest departure that is not before today, with its price and airline', () => {
+  assert.deepEqual(parseWitaDetail(fixture('wita-detail.html'), '2026-01-01'), { departure: '2026-11-28', price: 15900000, airline: 'China Airlines' });
+  assert.deepEqual(parseWitaDetail(fixture('wita-detail.html'), '2026-11-28'), { departure: '2026-11-28', price: 15900000, airline: 'China Airlines' });
+  assert.deepEqual(parseWitaDetail(fixture('wita-detail.html'), '2026-11-29'), { departure: '2027-04-20', price: 17900000, airline: 'Singapore Airlines' });
+});
+
+test('parseWitaDetail returns null when no departure is left or the page has none', () => {
+  assert.equal(parseWitaDetail(fixture('wita-detail.html'), '2027-04-21'), null);
+  assert.equal(parseWitaDetail('<html><body>maintenance</body></html>', '2026-01-01'), null);
+});
+
+test('parseWitaDetail uses null for a missing price or airline', () => {
+  const html = '<div class="modal-schedule-items"><p class="grouptour-modal-content-header">05 Jan 2027 - 09 Jan 2027</p></div>';
+  assert.deepEqual(parseWitaDetail(html, '2026-01-01'), { departure: '2027-01-05', price: null, airline: null });
+});
+
+test('parseWitaDetail picks the earliest of unsorted dates, skips past ones and decodes the airline', () => {
+  const block = (date, airline) => `<div class="modal-schedule-items"><p class="grouptour-modal-content-header">${date}</p><span class="grouptour-modal-lower-blue">${airline}</span></div>`;
+  const html = block('09 Sep 2027 - 15 Sep 2027', 'Late Air') + block('03 Mar 2026 - 09 Mar 2026', 'Past Air') + block('7 Feb 2027 - 12 Feb 2027', 'Air &amp; Co');
+  assert.deepEqual(parseWitaDetail(html, '2026-06-01'), { departure: '2027-02-07', price: null, airline: 'Air & Co' });
 });

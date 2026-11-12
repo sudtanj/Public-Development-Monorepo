@@ -56,7 +56,7 @@ the program line by line and shows the same terminal output.
 
 ## Tour search
 
-[`tour-aggregator`](tour-aggregator) scrapes group tour packages from Avia Travel, Obaja Tour, Golden Rama, Dwidaya Tour and Bayu Buana daily into a
+[`tour-aggregator`](tour-aggregator) scrapes group tour packages from Avia Travel, Obaja Tour, Golden Rama, Dwidaya Tour, Bayu Buana and Wita Tour daily into a
 **[searchable page](https://sudtanj.github.io/Public-Development-Monorepo/tours/)** on the showcase.
 
 ## Thunkable and App Inventor apps

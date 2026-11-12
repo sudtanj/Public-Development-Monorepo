@@ -325,6 +325,77 @@ async function scrapeBayuBuana(out) {
   if (failures.length) throw new Error(`${failures.length} of ${regions.length} regions failed (${failures.join('; ')})`);
 }
 
+// ---- Wita Tour (witatour.com): server-rendered HTML; the global listing has every package, detail pages hold the dates ----
+
+const WITA = 'https://www.witatour.com';
+
+// The listing only shows a month range, so the exact departure and airline come from the detail page.
+export function parseWitaList(html) {
+  const destinations = new Map();
+  for (const m of html.matchAll(/<p class="col-12 subheader">([^<]*)<\/p>\s*<p class="col-12 header">([^<]*)<\/p>/g)) destinations.set(decode(m[2]), decode(m[1]));
+  const records = [];
+  for (const card of html.split('grouptour-slide-hover').slice(1)) {
+    const url = /grouptour-view-details btn" href="(https:\/\/www\.witatour\.com\/grouptours\/view\/[^"]+)"/.exec(card)?.[1];
+    const title = decode(/<p class="header">([^<]*)<\/p>/.exec(card)?.[1]);
+    if (!url || !title) continue;
+    const priceText = /<p class="price">([\d.]+)/.exec(card)?.[1];
+    records.push({
+      title,
+      url,
+      destination: destinations.get(title) ?? null,
+      days: Number(/fa-refresh"><\/span>\s*(\d+)/.exec(card)?.[1]) || null,
+      price: priceText ? Number(priceText.replace(/\./g, '')) || null : null,
+      image: /grouptour-slide-item" src="(https:[^"]+)"/.exec(card)?.[1] ?? null,
+    });
+  }
+  return records;
+}
+
+// The earliest departure that is not before `today`; null when none is left.
+export function parseWitaDetail(html, today) {
+  const departures = [];
+  for (const block of html.split('modal-schedule-items').slice(1)) {
+    const departure = parseAviaDate(/content-header">\s*(\d{1,2} [A-Za-z]{3} \d{4}) - /.exec(block)?.[1] ?? '');
+    if (!departure || departure < today) continue;
+    const priceText = /content-header">\s*Rp\.([\d.]+),-/.exec(block)?.[1];
+    departures.push({
+      departure,
+      price: priceText ? Number(priceText.replace(/\./g, '')) || null : null,
+      airline: decode(/grouptour-modal-lower-blue">([^<]*)</.exec(block)?.[1]) || null,
+    });
+  }
+  return departures.sort((a, b) => (a.departure < b.departure ? -1 : 1))[0] ?? null;
+}
+
+// One bad detail page doesn't stop the rest. Packages with no upcoming departure are skipped like Golden Rama's.
+async function scrapeWita(out, today) {
+  const tours = parseWitaList(await (await request(`${WITA}/grouptours/region?re=global`)).text());
+  if (tours.length === 0) throw new Error('no tours found on the global listing');
+  const failures = [];
+  for (const { url, ...tour } of tours) {
+    try {
+      const next = parseWitaDetail(await (await request(url)).text(), today);
+      if (!next) continue;
+      out.push({
+        source: 'Wita Tour',
+        title: tour.title,
+        url,
+        destination: tour.destination,
+        departure: next.departure,
+        days: tour.days,
+        price: next.price ?? tour.price,
+        currency: 'IDR',
+        airline: next.airline,
+        image: tour.image,
+      });
+    } catch (err) {
+      console.error(`Wita Tour ${tour.title}: ${err.message}`);
+      failures.push(`${tour.title}: ${err.message}`);
+    }
+  }
+  if (failures.length) throw new Error(`${failures.length} of ${tours.length} tours failed (${failures.join('; ')})`);
+}
+
 // Adding a company: write a scraper that pushes normalized records into `out`, then list it here.
 const SOURCES = [
   { name: 'Avia Travel', url: 'https://www.avia.travel/tour', scrape: scrapeAvia },
@@ -332,6 +403,7 @@ const SOURCES = [
   { name: 'Golden Rama', url: 'https://www.goldenrama.com/tours', scrape: scrapeGoldenRama },
   { name: 'Dwidaya Tour', url: 'https://www.dwidayatour.co.id/', scrape: scrapeDwidaya },
   { name: 'Bayu Buana', url: 'https://www.bayubuanatravel.com/', scrape: scrapeBayuBuana },
+  { name: 'Wita Tour', url: 'https://www.witatour.com/grouptours', scrape: scrapeWita },
 ];
 
 // `today` (YYYY-MM-DD, UTC) is the cutoff for past departures; records without a departure date are kept.
@@ -342,7 +414,7 @@ async function main(outPath, today = new Date().toISOString().slice(0, 10)) {
     const found = [];
     const entry = { name, url };
     try {
-      await scrape(found);
+      await scrape(found, today);
     } catch (err) {
       entry.error = err.message;
       console.error(`${name}: ${err.message}`);

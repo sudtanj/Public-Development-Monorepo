@@ -42,9 +42,10 @@ test('scrape writes tours.json from all sources, deduplicated by url', () => {
     { name: 'Golden Rama', url: 'https://www.goldenrama.com/tours', count: 2 },
     { name: 'Dwidaya Tour', url: 'https://www.dwidayatour.co.id/', count: 3 },
     { name: 'Bayu Buana', url: 'https://www.bayubuanatravel.com/', count: 3 },
+    { name: 'Wita Tour', url: 'https://www.witatour.com/grouptours', count: 2 },
   ]);
-  assert.equal(tours.length, 20);
-  assert.equal(new Set(tours.map((t) => t.url)).size, 20);
+  assert.equal(tours.length, 22);
+  assert.equal(new Set(tours.map((t) => t.url)).size, 22);
   const avia = tours.filter((t) => t.source === 'Avia Travel');
   assert.equal(avia.length, 10);
   assert.ok(avia.every((t) => t.destination === 'Africa'));
@@ -56,12 +57,15 @@ test('scrape writes tours.json from all sources, deduplicated by url', () => {
   const bayu = tours.filter((t) => t.source === 'Bayu Buana');
   assert.equal(bayu.length, 3);
   assert.ok(bayu.every((t) => t.destination === 'Europe'));
+  const wita = tours.filter((t) => t.source === 'Wita Tour');
+  assert.equal(wita.length, 2);
+  assert.deepEqual(wita.map((t) => [t.destination, t.departure, t.price, t.airline]), [['Taiwan', '2026-11-28', 15900000, 'China Airlines'], ['Europe', '2026-11-28', 15900000, 'China Airlines']]);
   assert.ok(tours.every((t) => t.currency === 'IDR' && t.url.startsWith('https://')));
 });
 
 test('scrape posts each region, reuses the session cookie on later pages and walks every Obaja page', () => {
   const { requests } = scrape();
-  assert.equal(requests.length, 20);
+  assert.equal(requests.length, 23);
   assert.deepEqual(requests.map((r) => `${r.method} ${r.url}`), [
     'GET https://www.avia.travel/tour',
     'POST https://www.avia.travel/search',
@@ -83,6 +87,9 @@ test('scrape posts each region, reuses the session cookie on later pages and wal
     'GET https://www.bayubuanatravel.com',
     'GET https://www.bayubuanatravel.com/tours-by-destination/europe',
     'GET https://www.bayubuanatravel.com/tours-by-destination/turkiye-middle-east',
+    'GET https://www.witatour.com/grouptours/region?re=global',
+    'GET https://www.witatour.com/grouptours/view/7d-6n-leisure-classic-taiwan-and-alishan/',
+    'GET https://www.witatour.com/grouptours/view/14d-11n-wita-europe-mediterranean-heritage-and-scenic-journey/',
   ]);
   assert.deepEqual([1, 3, 5].map((i) => requests[i].body), [
     'region=1&destination=0&name_destination=',
@@ -98,8 +105,8 @@ test('scrape drops departures before today and keeps the rest', () => {
   const run = scrape({ TOURS_TODAY: '2027-04-05' });
   assert.equal(run.status, 0, run.stderr);
   const { sources, tours } = run.result();
-  assert.deepEqual(sources.map((s) => s.count), [1, 1, 1, 1, 1]);
-  assert.deepEqual(tours.map((t) => t.departure).sort(), ['2027-04-07', '2027-04-12', '2027-06-07', '2027-06-21', '2027-09-09']);
+  assert.deepEqual(sources.map((s) => s.count), [1, 1, 1, 1, 1, 2]);
+  assert.deepEqual(tours.map((t) => t.departure).sort(), ['2027-04-07', '2027-04-12', '2027-04-20', '2027-04-20', '2027-06-07', '2027-06-21', '2027-09-09']);
 });
 
 test('scrape continues with the other regions when one region fails and records the error', () => {
@@ -110,12 +117,12 @@ test('scrape continues with the other regions when one region fails and records 
   assert.equal(sources[0].count, 10);
   assert.equal(sources[1].error, undefined);
   assert.equal(tours.filter((t) => t.destination === 'Australia & New Zealand').length, 10);
-  assert.equal(run.requests.length, 19);
+  assert.equal(run.requests.length, 22);
 });
 
 test('scrape does not follow pagination to another host, so the session cookie stays on Avia', () => {
   const { requests } = scrape({ FAKE_AVIA: 'offsite-next' });
-  assert.equal(requests.length, 17);
+  assert.equal(requests.length, 20);
   assert.ok(requests.every((r) => !r.url.includes('evil.example')));
 });
 
@@ -123,11 +130,11 @@ test('scrape retries with a browser user agent when the honest one is blocked', 
   const run = scrape({ FAKE_BLOCK_HONEST_UA: '1' });
   assert.equal(run.status, 0, run.stderr);
   const { requests } = run;
-  assert.equal(requests.length, 21);
+  assert.equal(requests.length, 24);
   assert.ok(requests[0].ua.startsWith('TourAggregator/1.0'));
   assert.equal(requests[1].url, requests[0].url);
   assert.ok(requests.slice(1).every((r) => r.ua.startsWith('Mozilla/5.0')));
-  assert.equal(run.result().tours.length, 20);
+  assert.equal(run.result().tours.length, 22);
 });
 
 test('scrape keeps the other source when Avia answers HTTP 500', () => {
@@ -138,8 +145,8 @@ test('scrape keeps the other source when Avia answers HTTP 500', () => {
   assert.match(sources[0].error, /HTTP 500/);
   assert.equal(sources[0].count, 0);
   assert.equal(sources[1].error, undefined);
-  assert.equal(tours.length, 10);
-  assert.deepEqual([...new Set(tours.map((t) => t.source))], ['Obaja Tour', 'Golden Rama', 'Dwidaya Tour', 'Bayu Buana']);
+  assert.equal(tours.length, 12);
+  assert.deepEqual([...new Set(tours.map((t) => t.source))], ['Obaja Tour', 'Golden Rama', 'Dwidaya Tour', 'Bayu Buana', 'Wita Tour']);
 });
 
 test('scrape keeps the other source when Obaja is unreachable', () => {
@@ -149,7 +156,7 @@ test('scrape keeps the other source when Obaja is unreachable', () => {
   assert.equal(sources[0].error, undefined);
   assert.equal(sources[1].error, 'fetch failed');
   assert.equal(sources[1].count, 0);
-  assert.equal(tours.length, 18);
+  assert.equal(tours.length, 20);
 });
 
 test('scrape survives non-JSON from Obaja and records the error', () => {
@@ -157,7 +164,7 @@ test('scrape survives non-JSON from Obaja and records the error', () => {
   assert.equal(run.status, 0, run.stderr);
   const { sources, tours } = run.result();
   assert.ok(sources[1].error);
-  assert.equal(tours.length, 18);
+  assert.equal(tours.length, 20);
 });
 
 test('scrape survives unparseable Avia result pages without an error entry', () => {
@@ -166,11 +173,11 @@ test('scrape survives unparseable Avia result pages without an error entry', () 
   const { sources, tours } = run.result();
   assert.equal(sources[0].count, 0);
   assert.equal('error' in sources[0], false);
-  assert.equal(tours.length, 10);
+  assert.equal(tours.length, 12);
 });
 
 test('scrape exits 1 and writes nothing when every source is down', () => {
-  const run = scrape({ FAKE_AVIA: 'down', FAKE_OBAJA: 'down', FAKE_GOLDENRAMA: 'down', FAKE_DWIDAYA: 'down', FAKE_BAYUBUANA: 'down' });
+  const run = scrape({ FAKE_AVIA: 'down', FAKE_OBAJA: 'down', FAKE_GOLDENRAMA: 'down', FAKE_DWIDAYA: 'down', FAKE_BAYUBUANA: 'down', FAKE_WITA: 'down' });
   assert.equal(run.status, 1);
   assert.match(run.stderr, /no tours scraped/);
   assert.equal(existsSync(run.out), false);
@@ -178,7 +185,7 @@ test('scrape exits 1 and writes nothing when every source is down', () => {
 });
 
 test('scrape exits 1 without crashing when every source returns a malformed body', () => {
-  const run = scrape({ FAKE_AVIA: 'malformed', FAKE_OBAJA: 'malformed', FAKE_GOLDENRAMA: 'malformed', FAKE_DWIDAYA: 'malformed', FAKE_BAYUBUANA: 'malformed' });
+  const run = scrape({ FAKE_AVIA: 'malformed', FAKE_OBAJA: 'malformed', FAKE_GOLDENRAMA: 'malformed', FAKE_DWIDAYA: 'malformed', FAKE_BAYUBUANA: 'malformed', FAKE_WITA: 'malformed' });
   assert.equal(run.status, 1);
   assert.match(run.stderr, /no regions found on \/tour/);
   assert.match(run.stderr, /no tours scraped/);
@@ -199,7 +206,7 @@ test('scrape keeps the other sources when Golden Rama answers HTTP 500', () => {
   const { sources, tours } = run.result();
   assert.match(sources[2].error, /HTTP 500/);
   assert.equal(sources[2].count, 0);
-  assert.equal(tours.length, 18);
+  assert.equal(tours.length, 20);
 });
 
 test('scrape records an error when the Golden Rama /tours page lists no areas', () => {
@@ -208,8 +215,8 @@ test('scrape records an error when the Golden Rama /tours page lists no areas', 
   const { sources, tours } = run.result();
   assert.match(sources[2].error, /no areas found on \/tours/);
   assert.equal(sources[2].count, 0);
-  assert.equal(tours.length, 18);
-  assert.equal(run.requests.length, 16);
+  assert.equal(tours.length, 20);
+  assert.equal(run.requests.length, 19);
 });
 
 test('scrape treats Golden Rama area pages without packages as empty, not as an error', () => {
@@ -218,8 +225,8 @@ test('scrape treats Golden Rama area pages without packages as empty, not as an 
   const { sources, tours } = run.result();
   assert.equal('error' in sources[2], false);
   assert.equal(sources[2].count, 0);
-  assert.equal(tours.length, 18);
-  assert.equal(run.requests.length, 18);
+  assert.equal(tours.length, 20);
+  assert.equal(run.requests.length, 21);
 });
 
 test('scrape records the error when one Golden Rama area page has broken data and keeps the other sources', () => {
@@ -235,7 +242,7 @@ test('scrape continues with the other Golden Rama areas when one fails', () => {
   const { sources } = run.result();
   assert.match(sources[2].error, /asia/);
   assert.equal(sources[2].count, 2);
-  assert.equal(run.requests.length, 19);
+  assert.equal(run.requests.length, 22);
 });
 
 test('scrape keeps the other sources when Dwidaya answers HTTP 500', () => {
@@ -244,7 +251,7 @@ test('scrape keeps the other sources when Dwidaya answers HTTP 500', () => {
   const { sources, tours } = run.result();
   assert.match(sources[3].error, /GetPackageSearchRQ -> HTTP 500/);
   assert.equal(sources[3].count, 0);
-  assert.equal(tours.length, 17);
+  assert.equal(tours.length, 19);
 });
 
 test('scrape records an error when the Dwidaya search lists no packages', () => {
@@ -253,7 +260,7 @@ test('scrape records an error when the Dwidaya search lists no packages', () => 
   const { sources, tours } = run.result();
   assert.match(sources[3].error, /no packages in the search result/);
   assert.equal(sources[3].count, 0);
-  assert.equal(tours.length, 17);
+  assert.equal(tours.length, 19);
 });
 
 test('scrape posts the Dwidaya request template back unchanged as a JSON string', () => {
@@ -268,8 +275,8 @@ test('scrape keeps the other sources when Bayu Buana answers HTTP 500', () => {
   const { sources, tours } = run.result();
   assert.match(sources[4].error, /HTTP 500/);
   assert.equal(sources[4].count, 0);
-  assert.equal(tours.length, 17);
-  assert.equal(run.requests.length, 18);
+  assert.equal(tours.length, 19);
+  assert.equal(run.requests.length, 21);
 });
 
 test('scrape records an error when the Bayu Buana home page links no regions', () => {
@@ -278,8 +285,8 @@ test('scrape records an error when the Bayu Buana home page links no regions', (
   const { sources, tours } = run.result();
   assert.match(sources[4].error, /no regions found on the home page/);
   assert.equal(sources[4].count, 0);
-  assert.equal(tours.length, 17);
-  assert.equal(run.requests.length, 18);
+  assert.equal(tours.length, 19);
+  assert.equal(run.requests.length, 21);
 });
 
 test('scrape continues with the other Bayu Buana regions when one fails', () => {
@@ -289,5 +296,35 @@ test('scrape continues with the other Bayu Buana regions when one fails', () => 
   assert.match(sources[4].error, /1 of 2 regions failed \(Europe: .*HTTP 500/);
   assert.equal(sources[4].count, 3);
   assert.deepEqual([...new Set(tours.filter((t) => t.source === 'Bayu Buana').map((t) => t.destination))], ['Turkiye & Middle East']);
-  assert.equal(run.requests.length, 20);
+  assert.equal(run.requests.length, 23);
+});
+
+test('scrape keeps the other sources when Wita Tour answers HTTP 500', () => {
+  const run = scrape({ FAKE_WITA: 'down' });
+  assert.equal(run.status, 0, run.stderr);
+  const { sources, tours } = run.result();
+  assert.match(sources[5].error, /HTTP 500/);
+  assert.equal(sources[5].count, 0);
+  assert.equal(tours.length, 20);
+  assert.equal(run.requests.length, 21);
+});
+
+test('scrape records an error when the Wita Tour listing has no tours', () => {
+  const run = scrape({ FAKE_WITA: 'list-broken' });
+  assert.equal(run.status, 0, run.stderr);
+  const { sources, tours } = run.result();
+  assert.match(sources[5].error, /no tours found on the global listing/);
+  assert.equal(sources[5].count, 0);
+  assert.equal(tours.length, 20);
+  assert.equal(run.requests.length, 21);
+});
+
+test('scrape continues with the other Wita Tour packages when one detail page fails', () => {
+  const run = scrape({ FAKE_WITA: 'detail-europe-down' });
+  assert.equal(run.status, 0, run.stderr);
+  const { sources, tours } = run.result();
+  assert.match(sources[5].error, /1 of 2 tours failed \(14D\/11N WITA EUROPE.*HTTP 500/);
+  assert.equal(sources[5].count, 1);
+  assert.deepEqual(tours.filter((t) => t.source === 'Wita Tour').map((t) => t.destination), ['Taiwan']);
+  assert.equal(run.requests.length, 23);
 });
