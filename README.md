@@ -22,10 +22,6 @@ Every `arduino-*` folder is a [Wokwi](https://wokwi.com/arduino) project (Arduin
 
 
 
-### Play in the browser
-
-**[▶ Open the interactive showcase](https://sudtanj.github.io/Public-Development-Monorepo/)** - each project runs live on GitHub Pages (avr8js simulator): drag the sensor slider and watch the serial monitor. GitHub READMEs cannot run scripts, so the playable version lives on that page.
-
 ### Try it on Wokwi
 
 - **In the browser:** open <https://wokwi.com/projects/new/arduino-uno>, then paste a project's `sketch/sketch.ino` and `diagram.json` into the editor.
@@ -42,7 +38,7 @@ arduino-<name>/
 └── scenario.test.yaml    # pass/fail check used by CI
 ```
 
-The showcase site is built by `.github/workflows/pages.yml` from `site/` and each project's compiled firmware.
+The browser showcase in `site/` (avr8js simulator, game and app players) is no longer hosted; open `site/index.html` from a local static server.
 
 Folders without a `wokwi.toml` are ignored by CI. The workflow needs a `WOKWI_CLI_TOKEN` repository secret
 (create one at <https://wokwi.com/dashboard/ci>).
@@ -50,14 +46,8 @@ Folders without a `wokwi.toml` are ignored by CI. The workflow needs a `WOKWI_CL
 ## C++
 
 [`cpp-battleship`](cpp-battleship) is a console Battleship prototype. `.github/workflows/cpp.yml` compiles it and plays
-a full game through stdin. The showcase has a
-**[▶ playable browser version](https://sudtanj.github.io/Public-Development-Monorepo/cpp-battleship/)** that models
+a full game through stdin. `site/cpp-battleship/` is a browser version that models
 the program line by line and shows the same terminal output.
-
-## Tour search
-
-[`tour-aggregator`](tour-aggregator) scrapes group tour packages from Avia Travel, Obaja Tour, Golden Rama, Dwidaya Tour, Bayu Buana and Wita Tour daily into a
-**[searchable page](https://sudtanj.github.io/Public-Development-Monorepo/tours/)** on the showcase.
 
 ## Thunkable and App Inventor apps
 
@@ -70,6 +60,6 @@ These are 2017 Android projects saved as `.aia` exports:
 
 `.github/workflows/aia.yml` validates the archives and publishes them as a downloadable artifact.
 
-**[▶ Play them in the showcase](https://sudtanj.github.io/Public-Development-Monorepo/)**: the player at
+The player at
 `site/aia/` draws each app's screen from the `.aia` and runs the app's blocks in the browser.
 See each folder's README for how to open the projects in App Inventor.
