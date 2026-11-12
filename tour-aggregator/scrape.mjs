@@ -235,11 +235,103 @@ async function scrapeGoldenRama(out) {
   if (failures.length) throw new Error(`${failures.length} of ${areas.length} areas failed (${failures.join('; ')})`);
 }
 
+// ---- Dwidaya Tour (dwidayatour.co.id): AngularJS site over a JSON API; one entry per package (nearest departure) ----
+
+const DWIDAYA = 'https://www.dwidayatour.co.id';
+
+export function parseDwidayaPackages(json) {
+  const records = [];
+  for (const p of json.Response?.ResponseDetails?.Search?.Packages?.Package ?? []) {
+    const title = decode(p.DisplayHolidayTypeName || p.Name);
+    if (!title || !p.PackageShortCode || !p.PackageStartDate) continue;
+    records.push({
+      source: 'Dwidaya Tour',
+      title,
+      url: `${DWIDAYA}/Package/PackageResult?PKGShortCode=${encodeURIComponent(p.PackageShortCode)}&lang=id`,
+      destination: decode(p.RegionName) || null,
+      departure: p.PackageStartDate,
+      days: Number(p.NoOfDays) || null,
+      price: Number(p.GrossPrice) || null,
+      currency: 'IDR',
+      airline: null,
+      image: p.Thumbnail || p.BigImage || null,
+    });
+  }
+  return records;
+}
+
+// The search form's own request template (it carries the public B2C key) is fetched and posted back unchanged,
+// which lists every package in one response of about 3 MB.
+async function scrapeDwidaya(out) {
+  const template = await (await request(`${DWIDAYA}/Home/Package/GetPackageSearchRQ`)).text();
+  const res = await request(`${DWIDAYA}/Home/Package/GetPackageResult`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ searchRequest: template }),
+  });
+  const records = parseDwidayaPackages(await res.json());
+  if (records.length === 0) throw new Error('no packages in the search result');
+  out.push(...records);
+}
+
+// ---- Bayu Buana (bayubuanatravel.com): server-rendered HTML, one page per region lists every tour (no paging) ----
+
+const BAYU_BUANA = 'https://www.bayubuanatravel.com';
+
+export function parseBayuBuanaRegions(html) {
+  const regions = new Map();
+  for (const m of html.matchAll(/<a href="\/tours-by-destination\/([a-z0-9-]+)">([^<]+)<\/a>/g)) regions.set(m[1], decode(m[2]));
+  return [...regions].map(([slug, name]) => ({ slug, name }));
+}
+
+// Each card lists all its departures in `data-dates`; the earliest one is used. Detail pages (airline) are not fetched.
+export function parseBayuBuanaPage(html, destination) {
+  const records = [];
+  for (const card of html.split('<li class="pkg-tour-list').slice(1)) {
+    const link = /<h3 class="p-card-title[^>]*>\s*<a href="(\/tours\/[^"]+)">([^<]*)<\/a>/.exec(card);
+    const title = decode(link?.[2]);
+    const departure = [...(/data-dates="([^"]*)"/.exec(card)?.[1] ?? '').matchAll(/\d{4}-\d{2}-\d{2}/g)].map((m) => m[0]).sort()[0];
+    if (!title || !departure) continue;
+    const priceText = /class="promo-rate">\s*IDR\s*([\d.,]+)/.exec(card)?.[1];
+    records.push({
+      source: 'Bayu Buana',
+      title,
+      url: `${BAYU_BUANA}${link[1]}`,
+      destination,
+      departure,
+      days: Number(/(\d+)D\b/.exec(title)?.[1]) || null,
+      price: priceText ? Number(priceText.replace(/[.,]/g, '')) || null : null,
+      currency: 'IDR',
+      airline: null,
+      image: /<div class="tour-package-thumb">\s*<a [^>]*><img src="([^"]+)"/.exec(card)?.[1] ?? null,
+    });
+  }
+  return records;
+}
+
+// Tours listed under several regions are kept once, under the first region (main dedupes by url).
+async function scrapeBayuBuana(out) {
+  const regions = parseBayuBuanaRegions(await (await request(BAYU_BUANA)).text());
+  if (regions.length === 0) throw new Error('no regions found on the home page');
+  const failures = [];
+  for (const { slug, name } of regions) {
+    try {
+      out.push(...parseBayuBuanaPage(await (await request(`${BAYU_BUANA}/tours-by-destination/${slug}`)).text(), name));
+    } catch (err) {
+      console.error(`Bayu Buana ${name}: ${err.message}`);
+      failures.push(`${name}: ${err.message}`);
+    }
+  }
+  if (failures.length) throw new Error(`${failures.length} of ${regions.length} regions failed (${failures.join('; ')})`);
+}
+
 // Adding a company: write a scraper that pushes normalized records into `out`, then list it here.
 const SOURCES = [
   { name: 'Avia Travel', url: 'https://www.avia.travel/tour', scrape: scrapeAvia },
   { name: 'Obaja Tour', url: 'https://www.obajatour.com/group-tour', scrape: scrapeObaja },
   { name: 'Golden Rama', url: 'https://www.goldenrama.com/tours', scrape: scrapeGoldenRama },
+  { name: 'Dwidaya Tour', url: 'https://www.dwidayatour.co.id/', scrape: scrapeDwidaya },
+  { name: 'Bayu Buana', url: 'https://www.bayubuanatravel.com/', scrape: scrapeBayuBuana },
 ];
 
 // `today` (YYYY-MM-DD, UTC) is the cutoff for past departures; records without a departure date are kept.

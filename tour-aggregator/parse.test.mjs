@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { decode, parseAviaDate, parseAviaPage, parseAviaRegions, parseGoldenRamaAreas, parseGoldenRamaPage, parseObajaTours } from './scrape.mjs';
+import { decode, parseBayuBuanaPage, parseBayuBuanaRegions, parseDwidayaPackages, parseAviaDate, parseAviaPage, parseAviaRegions, parseGoldenRamaAreas, parseGoldenRamaPage, parseObajaTours } from './scrape.mjs';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 
@@ -278,6 +278,8 @@ test('all sources emit records with the same fields, which site/tours/app.js rea
   assert.deepEqual(Object.keys(avia).sort(), fields);
   assert.deepEqual(Object.keys(obaja).sort(), fields);
   assert.deepEqual(Object.keys(parseGoldenRamaPage(fixture('goldenrama-tours.html')).records[0]).sort(), fields);
+  assert.deepEqual(Object.keys(parseDwidayaPackages(JSON.parse(fixture('dwidaya-packages.json')))[0]).sort(), fields);
+  assert.deepEqual(Object.keys(parseBayuBuanaPage(fixture('bayubuana-region.html'), 'Europe')[0]).sort(), fields);
 });
 
 test('parseGoldenRamaAreas lists each area link once', () => {
@@ -377,4 +379,148 @@ test('parseGoldenRamaPage reads the destination from the area and decodes the ti
   const html = grPage([grTour({ name: 'A &amp; B' })], { total: 1 }, { tourDetailByArea: { data: { name: 'Eropa' } } });
   const [r] = parseGoldenRamaPage(html).records;
   assert.deepEqual([r.destination, r.title], ['Eropa', 'A & B']);
+});
+
+const dwPage = (...Package) => ({ Response: { ResponseDetails: { Search: { Packages: { Package } } } } });
+const dwPackage = (over = {}) => ({ Name: 'Tour 1 Jan 2027', PackageShortCode: 'T1', PackageStartDate: '2027-01-01', NoOfDays: '5', GrossPrice: '1000', ...over });
+
+test('parseDwidayaPackages maps each package, skips the one without a start date and strips the price decimals', () => {
+  assert.deepEqual(parseDwidayaPackages(JSON.parse(fixture('dwidaya-packages.json'))), [
+    {
+      source: 'Dwidaya Tour',
+      title: '5D4N Indie GO Vietnam Sapa + Halong Bay [EXCLUDE AIR TICKET]',
+      url: 'https://www.dwidayatour.co.id/Package/PackageResult?PKGShortCode=XPASVSAPA&lang=id',
+      destination: 'Vietnam',
+      departure: '2026-11-30',
+      days: 5,
+      price: 5999000,
+      currency: 'IDR',
+      airline: null,
+      image: 'https://drive.google.com/thumbnail?id=1XYLWCcckLBGZG4ShV9dlUMqf-rAcp7y-&sz=w1000',
+    },
+    {
+      source: 'Dwidaya Tour',
+      title: 'OPEN TRIP PAPANDAYAN 6 Mar 2027',
+      url: 'https://www.dwidayatour.co.id/Package/PackageResult?PKGShortCode=FDTPAPAN&lang=id',
+      destination: 'West Java',
+      departure: '2027-03-06',
+      days: 1,
+      price: 360000,
+      currency: 'IDR',
+      airline: null,
+      image: null,
+    },
+    {
+      source: 'Dwidaya Tour',
+      title: '9D Luxury Western Europe & Lourdes',
+      url: 'https://www.dwidayatour.co.id/Package/PackageResult?PKGShortCode=VDEUWELOLUX9&lang=id',
+      destination: 'Western Europe',
+      departure: '2027-09-09',
+      days: 9,
+      price: 46543500,
+      currency: 'IDR',
+      airline: null,
+      image: 'https://cdn.example.test/europe.jpg',
+    },
+  ]);
+});
+
+test('parseDwidayaPackages returns nothing for a response without packages', () => {
+  assert.deepEqual(parseDwidayaPackages({}), []);
+  assert.deepEqual(parseDwidayaPackages({ Response: { ResponseDetails: { Error: { Code: 1 }, Search: null } } }), []);
+});
+
+test('parseDwidayaPackages uses null for missing days, price, region and image', () => {
+  const [r] = parseDwidayaPackages(dwPage(dwPackage({ NoOfDays: '', GrossPrice: '', RegionName: '', Thumbnail: '', BigImage: '' })));
+  assert.deepEqual([r.days, r.price, r.destination, r.image], [null, null, null, null]);
+});
+
+test('parseDwidayaPackages skips packages without a title, code or start date and keeps the rest', () => {
+  const records = parseDwidayaPackages(dwPage(dwPackage({ Name: ' ' }), dwPackage({ PackageShortCode: '' }), dwPackage({ PackageStartDate: null }), dwPackage({ PackageShortCode: 'OK' })));
+  assert.deepEqual(records.map((r) => r.url.split('=')[1].split('&')[0]), ['OK']);
+});
+
+test('parseDwidayaPackages prefers the display title, which has no date suffix, and decodes it', () => {
+  const [r] = parseDwidayaPackages(dwPage(dwPackage({ DisplayHolidayTypeName: 'A &amp; B' })));
+  assert.equal(r.title, 'A & B');
+});
+
+test('parseDwidayaPackages escapes the package code in the url', () => {
+  const [r] = parseDwidayaPackages(dwPage(dwPackage({ PackageShortCode: 'A B&C' })));
+  assert.equal(r.url, 'https://www.dwidayatour.co.id/Package/PackageResult?PKGShortCode=A%20B%26C&lang=id');
+});
+
+test('parseBayuBuanaRegions lists each region once, in page order, and ignores the image tiles', () => {
+  assert.deepEqual(parseBayuBuanaRegions(fixture('bayubuana-home.html')), [
+    { slug: 'europe', name: 'Europe' },
+    { slug: 'turkiye-middle-east', name: 'Turkiye & Middle East' },
+  ]);
+  assert.deepEqual(parseBayuBuanaRegions('<html></html>'), []);
+});
+
+test('parseBayuBuanaPage maps each card with its earliest departure, discounted price and days from the title', () => {
+  assert.deepEqual(parseBayuBuanaPage(fixture('bayubuana-region.html'), 'Europe'), [
+    {
+      source: 'Bayu Buana',
+      title: '11D/08N EXPERIA WEST EUROPE with PARIS RIVER CRUISE plus LUXEMBOURG (XWE1)',
+      url: 'https://www.bayubuanatravel.com/tours/11d08n-experia-west-europe-with-paris-river-cruise-plus-luxembourg-xwe1',
+      destination: 'Europe',
+      departure: '2027-01-14',
+      days: 11,
+      price: 24888000,
+      currency: 'IDR',
+      airline: null,
+      image: 'https://assets-tour.bayubuanatravel.com/image/fcf528b2-0d07-4290-9845-f6acdae3471c/EU-Eiffel%20Tower.jpg',
+    },
+    {
+      source: 'Bayu Buana',
+      title: '10D/07N EXPERIA TURKIYE with CAPPADOCIA (XMT1)',
+      url: 'https://www.bayubuanatravel.com/tours/10d07n-experia-turkiye-with-cappadocia-xmt1',
+      destination: 'Europe',
+      departure: '2027-06-07',
+      days: 10,
+      price: 16888000,
+      currency: 'IDR',
+      airline: null,
+      image: null,
+    },
+    {
+      source: 'Bayu Buana',
+      title: '12D/09N AMAZING EAST EUROPE with HALLSTATT & INNSBRUCK plus MARIENBRUCKE (EEA2)',
+      url: 'https://www.bayubuanatravel.com/tours/12d09n-amazing-east-europe-with-hallstatt-innsbruck-plus-marienbrucke-eea2',
+      destination: 'Europe',
+      departure: '2026-12-05',
+      days: 12,
+      price: 28888000,
+      currency: 'IDR',
+      airline: null,
+      image: 'https://assets-tour.bayubuanatravel.com/image/c1c9ce7e-16c1-46d9-ac4b-6e3cac767c67/EU-Hallstatt.jpg',
+    },
+  ]);
+});
+
+const bbCard = (over = {}) => {
+  const { dates = '[&#34;2027-01-01T00:00:00Z&#34;]', title = '5D/04N Tour', price = '<h6 class="promo-rate">IDR 1,000,000</h6>' } = over;
+  return `<li class="pkg-tour-list all-tours" data-dates="${dates}"> <div class="tour-package-thumb"> <a href="/tours/t"></a> </div> <h3 class="p-card-title title"> <a href="/tours/t">${title}</a> </h3> ${price} </li>`;
+};
+
+test('parseBayuBuanaPage uses null for a missing price and for a title without a day count', () => {
+  const [r] = parseBayuBuanaPage(bbCard({ price: '', title: 'Honeymoon special' }), 'Asia');
+  assert.deepEqual([r.price, r.days], [null, null]);
+  assert.equal(parseBayuBuanaPage(bbCard({ price: '<h6 class="promo-rate">IDR 0</h6>' }), 'Asia')[0].price, null);
+});
+
+test('parseBayuBuanaPage skips cards without a readable date or title and keeps the rest', () => {
+  const html = [bbCard({ dates: '[]' }), bbCard({ title: ' ' }), bbCard()].join('');
+  assert.equal(parseBayuBuanaPage(html, 'Asia').length, 1);
+  assert.equal(parseBayuBuanaPage(bbCard({ dates: '' }), 'Asia').length, 0);
+});
+
+test('parseBayuBuanaPage picks the earliest of unsorted dates', () => {
+  const dates = '[&#34;2027-12-01T00:00:00Z&#34;,&#34;2027-02-03T00:00:00Z&#34;,&#34;2027-10-09T00:00:00Z&#34;]';
+  assert.equal(parseBayuBuanaPage(bbCard({ dates }), 'Asia')[0].departure, '2027-02-03');
+});
+
+test('parseBayuBuanaPage returns nothing for pages without cards', () => {
+  assert.deepEqual(parseBayuBuanaPage('<html><body>maintenance</body></html>', 'Asia'), []);
 });
