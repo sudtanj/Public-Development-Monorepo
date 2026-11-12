@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Indonesian tour search</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:1.5rem 0}
+  .filters label{display:flex;flex-direction:column;gap:.25rem;font-size:.9rem}
+  .filters input,.filters select{font:inherit;padding:.5rem;border:1px solid #767676;border-radius:8px;background:#fff;color:inherit}
+  .filters .wide{grid-column:1/-1}
+  :is(input,select,button,a):focus-visible{outline:2px solid #0b6bcb;outline-offset:2px}
+  #meta,#summary{color:#555;font-size:.9rem}
+  #summary{margin:.5rem 0 1rem}
+  .tours li{display:flex;flex-direction:column;gap:.5rem}
+  .tours img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#eee}
+  .tours h3{margin:0;font-size:1.05rem}
+  .tours dl{display:grid;grid-template-columns:auto 1fr;gap:.25rem 1rem;margin:0;font-size:.9rem}
+  .tours dt{color:#555}
+  .tours dd{margin:0}
+  .price{font-size:1.1rem;font-weight:600;font-variant-numeric:tabular-nums}
+  .tours a.go{margin-top:auto}
+  #more{font:inherit;padding:.5rem 1rem;border:1px solid #0b6bcb;border-radius:8px;background:#fff;color:#0b6bcb;cursor:pointer;margin:1rem 0}
+  #more:hover{background:#eaf2fc}
+  .note{padding:1rem;border:1px solid #ddd;border-radius:8px}
+  .note.error{border-color:#b00020;color:#b00020}
+  @media (prefers-reduced-motion:no-preference){#more{transition:background .15s}}
+</style></head>
+<body>
+<p><a href="../index.html">← All projects</a></p>
+<h1>Indonesian tour search</h1>
+<p>Group tour packages from <a href="https://www.avia.travel/">Avia Travel</a> and <a href="https://www.obajatour.com/">Obaja Tour</a>,
+searchable in one place. Prices are the "from" price in IDR and links open the operator's own site, where the
+current price and seats are confirmed. <span id="meta"></span></p>
+<form class="filters" id="filters" role="search" aria-label="Filter tours">
+  <label class="wide">Search title or destination<input type="search" id="q" autocomplete="off" placeholder="e.g. Japan, Eropa, Turki"></label>
+  <label>Company<select id="source"><option value="">All</option></select></label>
+  <label>Destination<select id="destination"><option value="">All</option></select></label>
+  <label>Departure month<select id="month"><option value="">Any</option></select></label>
+  <label>Max price (IDR million)<input type="number" id="price" min="0" step="1" inputmode="numeric"></label>
+  <label>Max days<input type="number" id="days" min="1" step="1" inputmode="numeric"></label>
+  <label>Sort by<select id="sort">
+    <option value="departure">Earliest departure</option>
+    <option value="price">Lowest price</option>
+  </select></label>
+</form>
+<p id="summary" role="status" aria-live="polite">Loading tours…</p>
+<ul class="cards tours" id="results"></ul>
+<button type="button" id="more" hidden>Show more</button>
+<script src="app.js"></script>
+</body></html>

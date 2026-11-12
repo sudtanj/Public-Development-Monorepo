@@ -1,0 +1,47 @@
+// Preloaded with `node --import` so the real scrape.mjs runs against canned responses.
+// FAKE_AVIA / FAKE_OBAJA: ok (default) | down (HTTP 500) | offline (network error) | malformed (not the expected format)
+// FAKE_AVIA=garbage-results serves the region list but unparseable search pages; region-1-down answers HTTP 500 to
+// the search for region 1 only; offsite-next points the pagination arrow at another host.
+// FAKE_BLOCK_HONEST_UA=1 answers 403 to the project's own user agent. Every request is appended to FAKE_LOG as JSON.
+import { appendFileSync, readFileSync } from 'node:fs';
+
+const fixture = (name) => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8');
+
+const realSetTimeout = globalThis.setTimeout;
+globalThis.setTimeout = (fn, _ms, ...args) => realSetTimeout(fn, 0, ...args);
+
+function avia(mode, method, pathname, body) {
+  if (pathname === '/tour') return new Response(fixture('avia-regions.html'));
+  let results = mode === 'garbage-results' ? '<html><body>maintenance</body></html>' : fixture('avia-search.html');
+  if (mode === 'offsite-next') results = results.replace(/<a href="[^"]*">(<i class="fa fa-chevron-right")/, '<a href="https://evil.example/search/9">$1');
+  if (method === 'POST' && pathname === '/search') {
+    if (mode === 'region-1-down' && body.startsWith('region=1&')) return new Response('boom', { status: 500 });
+    // The real site repeats the same Set-Cookie header several times.
+    const headers = new Headers();
+    for (let i = 0; i < 3; i++) headers.append('Set-Cookie', 'PHPSESSID=abc123; path=/; HttpOnly');
+    return new Response(results, { headers });
+  }
+  if (pathname.startsWith('/search/')) return new Response(results.replace(/<ul class='pagination'>[\s\S]*$/, ''));
+  return new Response('not found', { status: 404 });
+}
+
+function obaja(page) {
+  const body = page === '1' ? fixture('obaja-tours.json') : '{"data":[],"last_page":3}';
+  return new Response(body, { headers: { 'Content-Type': 'application/json' } });
+}
+
+globalThis.fetch = async (url, init = {}) => {
+  const { hostname, pathname, searchParams } = new URL(url);
+  const headers = init.headers ?? {};
+  const method = init.method ?? 'GET';
+  appendFileSync(process.env.FAKE_LOG, `${JSON.stringify({ url: String(url), method, ua: headers['User-Agent'], cookie: headers.Cookie ?? null, body: init.body ?? null })}\n`);
+  if (process.env.FAKE_BLOCK_HONEST_UA && headers['User-Agent'].startsWith('TourAggregator')) {
+    return new Response('blocked', { status: 403 });
+  }
+  const isAvia = hostname === 'www.avia.travel';
+  const mode = (isAvia ? process.env.FAKE_AVIA : process.env.FAKE_OBAJA) ?? 'ok';
+  if (mode === 'down') return new Response('boom', { status: 500 });
+  if (mode === 'offline') throw new TypeError('fetch failed');
+  if (mode === 'malformed') return new Response('<html><body>{"data": [');
+  return isAvia ? avia(mode, method, pathname, init.body ?? '') : obaja(searchParams.get('page'));
+};

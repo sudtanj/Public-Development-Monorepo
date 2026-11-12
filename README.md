@@ -54,6 +54,11 @@ a full game through stdin. The showcase has a
 **[▶ playable browser version](https://sudtanj.github.io/Public-Development-Monorepo/cpp-battleship/)** that models
 the program line by line and shows the same terminal output.
 
+## Tour search
+
+[`tour-aggregator`](tour-aggregator) scrapes group tour packages from Avia Travel and Obaja Tour daily into a
+**[searchable page](https://sudtanj.github.io/Public-Development-Monorepo/tours/)** on the showcase.
+
 ## Thunkable and App Inventor apps
 
 These are 2017 Android projects saved as `.aia` exports:
