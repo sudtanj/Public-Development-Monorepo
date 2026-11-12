@@ -16,6 +16,56 @@ function el(tag, text, attrs = {}) {
   return node;
 }
 
+// Our own place index: operators label regions differently ("China | Hong Kong | Macau | Taiwan", "Eropa", "All Asia"),
+// so a place matches any tour whose title or operator label mentions one of its words. A term naming another place pulls in all of its words.
+const PLACES = {
+  Asia: ['asia', 'East Asia', 'Southeast Asia', 'Central Asia', 'India', 'Nepal', 'Bhutan'],
+  'East Asia': ['China', 'Hong Kong', 'Macau', 'Taiwan', 'Japan', 'Korea'],
+  'Southeast Asia': ['south east asia', 'southeast asia', 'Vietnam', 'Thailand', 'Singapore', 'Malaysia'],
+  'Central Asia': ['central asia', 'Uzbekistan', 'Kazakhstan'],
+  China: ['china', 'tiongkok', 'cina'],
+  'Hong Kong': ['hong kong', 'hongkong'],
+  Macau: ['macau', 'macao'],
+  Taiwan: ['taiwan'],
+  Japan: ['japan', 'jepang'],
+  Korea: ['korea'],
+  Vietnam: ['vietnam', 'saigon', 'hanoi'],
+  Thailand: ['thailand', 'bangkok', 'pattaya'],
+  Singapore: ['singapore'],
+  Malaysia: ['malaysia'],
+  India: ['india'],
+  Nepal: ['nepal'],
+  Bhutan: ['bhutan'],
+  Uzbekistan: ['uzbekistan'],
+  Kazakhstan: ['kazakhstan'],
+  Europe: ['europe', 'eropa', 'Switzerland', 'United Kingdom', 'Italy', 'France', 'Spain', 'Portugal', 'Germany', 'Austria', 'Scandinavia', 'Russia', 'Greece'],
+  Switzerland: ['switzerland', 'swiss'],
+  'United Kingdom': ['united kingdom', 'uk', 'england', 'scotland', 'london'],
+  Italy: ['italy', 'dolomites'],
+  France: ['france', 'paris'],
+  Spain: ['spain'],
+  Portugal: ['portugal'],
+  Germany: ['germany'],
+  Austria: ['austria', 'hallstatt'],
+  Scandinavia: ['scandinavia', 'norway', 'finland', 'sweden', 'denmark', 'iceland'],
+  Russia: ['russia'],
+  Greece: ['greece'],
+  'Middle East': ['middle east', 'timur tengah', 'Turkey', 'dubai', 'uae', 'jordan'],
+  Turkey: ['turkey', 'turkiye', 'turki'],
+  Africa: ['africa', 'afrika', 'Egypt', 'Morocco', 'tunisia'],
+  Egypt: ['egypt', 'mesir'],
+  Morocco: ['morocco'],
+  Oceania: ['oceania', 'Australia', 'New Zealand'],
+  Australia: ['australia', 'sydney', 'melbourne'],
+  'New Zealand': ['new zealand', 'hobbiton'],
+  America: ['america', 'amerika', 'USA', 'Canada'],
+  USA: ['usa', 'united states'],
+  Canada: ['canada'],
+};
+const REGIONS = new Set(['Asia', 'East Asia', 'Southeast Asia', 'Central Asia', 'Europe', 'Middle East', 'Africa', 'Oceania', 'America']);
+const placeTerms = (name) => PLACES[name].flatMap((term) => (PLACES[term] ? placeTerms(term) : [term]));
+const PLACE_PATTERNS = Object.keys(PLACES).map((name) => [name, new RegExp(`\\b(${placeTerms(name).join('|')})\\b`)]);
+
 const isHttps = (u) => typeof u === 'string' && u.startsWith('https://');
 const formatDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const formatMonth = (ym) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -36,6 +86,18 @@ function tidyTitle(title) {
 
 function fillSelect(select, values, label = (v) => v) {
   for (const v of values) select.append(el('option', label(v), { value: v }));
+}
+
+function fillPlaces(list) {
+  const counts = new Map();
+  for (const t of list) for (const name of t.places) counts.set(name, (counts.get(name) ?? 0) + 1);
+  const group = (label, regions) => {
+    const names = [...counts.keys()].filter((name) => REGIONS.has(name) === regions).sort();
+    const node = el('optgroup', null, { label });
+    for (const name of names) node.append(el('option', `${name} (${formatCount(counts.get(name))})`, { value: name }));
+    return node;
+  };
+  destination.append(group('Regions', true), group('Countries', false));
 }
 
 function setSelect(select, value) {
@@ -196,7 +258,7 @@ function applyFilters() {
   matches = tours.filter((t) =>
     (!needle || t.haystack.includes(needle)) &&
     (!wantedSource || t.source === wantedSource) &&
-    (!destination.value || t.destination === destination.value) &&
+    (!destination.value || t.places.has(destination.value)) &&
     (!month.value || (t.departure ?? '').startsWith(month.value)) &&
     (price.value === '' || (t.price != null && t.price <= maxPrice)) &&
     (days.value === '' || (t.days != null && t.days <= maxDays)));
@@ -276,7 +338,10 @@ async function load() {
     const when = data.updated ? new Date(data.updated) : null;
     if (when && Number.isNaN(when.getTime())) throw new Error('invalid update time');
 
-    tours = data.tours.map((t) => ({ ...t, haystack: `${t.title} ${t.destination ?? ''}`.toLowerCase() }));
+    tours = data.tours.map((t) => {
+      const haystack = `${t.title} ${t.destination ?? ''}`.toLowerCase();
+      return { ...t, haystack, places: new Set(PLACE_PATTERNS.filter(([, re]) => re.test(haystack)).map(([name]) => name)) };
+    });
     const sources = data.sources ?? [];
     if (sources.length) showSources(sources);
     showFailedSources(sources);
@@ -292,7 +357,7 @@ async function load() {
     destination.replaceChildren(el('option', 'All destinations', { value: '' }));
     month.replaceChildren(el('option', 'Any month', { value: '' }));
     fillSources(distinct(tours.map((t) => t.source)), counts);
-    fillSelect(destination, distinct(tours.map((t) => t.destination)));
+    fillPlaces(tours);
     fillSelect(month, distinct(tours.map((t) => t.departure?.slice(0, 7))), formatMonth);
   } catch (err) {
     fail(`The list did not load (${err.message}). Check your connection and try again.`);
